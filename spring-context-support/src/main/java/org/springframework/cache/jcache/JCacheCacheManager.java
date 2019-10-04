@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2017 the original author or authors.
+ * Copyright 2002-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +18,7 @@ package org.springframework.cache.jcache;
 
 import java.util.Collection;
 import java.util.LinkedHashSet;
+
 import javax.cache.CacheManager;
 import javax.cache.Caching;
 
@@ -45,15 +46,18 @@ public class JCacheCacheManager extends AbstractTransactionSupportingCacheManage
 
 
 	/**
-	 * Create a new JCacheCacheManager, setting the target JCache CacheManager
-	 * through the {@link #setCacheManager} bean property.
+	 * Create a new {@code JCacheCacheManager} without a backing JCache
+	 * {@link CacheManager javax.cache.CacheManager}.
+	 * <p>The backing JCache {@code javax.cache.CacheManager} can be set via the
+	 * {@link #setCacheManager} bean property.
 	 */
 	public JCacheCacheManager() {
 	}
 
 	/**
-	 * Create a new JCacheCacheManager for the given backing JCache.
-	 * @param cacheManager the backing JCache {@link CacheManager javax.cache.CacheManager}
+	 * Create a new {@code JCacheCacheManager} for the given backing JCache
+	 * {@link CacheManager javax.cache.CacheManager}.
+	 * @param cacheManager the backing JCache {@code javax.cache.CacheManager}
 	 */
 	public JCacheCacheManager(CacheManager cacheManager) {
 		this.cacheManager = cacheManager;

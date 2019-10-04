@@ -1,11 +1,11 @@
 /*
- * Copyright 2002-2018 the original author or authors.
+ * Copyright 2002-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -26,10 +26,27 @@ import org.springframework.util.StringUtils;
 /**
  * A data size, such as '12MB'.
  *
- * <p>This class models a size in terms of bytes and is immutable and thread-safe.
+ * <p>This class models data size in terms of bytes and is immutable and thread-safe.
+ *
+ * <p>The terms and units used in this class are based on
+ * <a href="https://en.wikipedia.org/wiki/Binary_prefix">binary prefixes</a>
+ * indicating multiplication by powers of 2. Consult the following table and
+ * the Javadoc for {@link DataUnit} for details.
+ *
+ * <p>
+ * <table border="1">
+ * <tr><th>Term</th><th>Data Size</th><th>Size in Bytes</th></tr>
+ * <tr><td>byte</td><td>1B</td><td>1</td></tr>
+ * <tr><td>kilobyte</td><td>1KB</td><td>1,024</td></tr>
+ * <tr><td>megabyte</td><td>1MB</td><td>1,048,576</td></tr>
+ * <tr><td>gigabyte</td><td>1GB</td><td>1,073,741,824</td></tr>
+ * <tr><td>terabyte</td><td>1TB</td><td>1,099,511,627,776</td></tr>
+ * </table>
  *
  * @author Stephane Nicoll
+ * @author Sam Brannen
  * @since 5.1
+ * @see DataUnit
  */
 public final class DataSize implements Comparable<DataSize> {
 
@@ -39,24 +56,24 @@ public final class DataSize implements Comparable<DataSize> {
 	private static final Pattern PATTERN = Pattern.compile("^([+\\-]?\\d+)([a-zA-Z]{0,2})$");
 
 	/**
-	 * Bytes per KiloByte.
+	 * Bytes per Kilobyte.
 	 */
-	private static long BYTES_PER_KB = 1024;
+	private static final long BYTES_PER_KB = 1024;
 
 	/**
-	 * Bytes per MegaByte.
+	 * Bytes per Megabyte.
 	 */
-	private static long BYTES_PER_MB = BYTES_PER_KB * 1024;
+	private static final long BYTES_PER_MB = BYTES_PER_KB * 1024;
 
 	/**
-	 * Bytes per GigaByte.
+	 * Bytes per Gigabyte.
 	 */
-	private static long BYTES_PER_GB = BYTES_PER_MB * 1024;
+	private static final long BYTES_PER_GB = BYTES_PER_MB * 1024;
 
 	/**
-	 * Bytes per TeraByte.
+	 * Bytes per Terabyte.
 	 */
-	private static long BYTES_PER_TB = BYTES_PER_GB * 1024;
+	private static final long BYTES_PER_TB = BYTES_PER_GB * 1024;
 
 
 	private final long bytes;
@@ -78,38 +95,38 @@ public final class DataSize implements Comparable<DataSize> {
 
 	/**
 	 * Obtain a {@link DataSize} representing the specified number of kilobytes.
-	 * @param kiloBytes the number of kilobytes, positive or negative
+	 * @param kilobytes the number of kilobytes, positive or negative
 	 * @return a {@link DataSize}
 	 */
-	public static DataSize ofKiloBytes(long kiloBytes) {
-		return new DataSize(Math.multiplyExact(kiloBytes, BYTES_PER_KB));
+	public static DataSize ofKilobytes(long kilobytes) {
+		return new DataSize(Math.multiplyExact(kilobytes, BYTES_PER_KB));
 	}
 
 	/**
 	 * Obtain a {@link DataSize} representing the specified number of megabytes.
-	 * @param megaBytes the number of megabytes, positive or negative
+	 * @param megabytes the number of megabytes, positive or negative
 	 * @return a {@link DataSize}
 	 */
-	public static DataSize ofMegaBytes(long megaBytes) {
-		return new DataSize(Math.multiplyExact(megaBytes, BYTES_PER_MB));
+	public static DataSize ofMegabytes(long megabytes) {
+		return new DataSize(Math.multiplyExact(megabytes, BYTES_PER_MB));
 	}
 
 	/**
 	 * Obtain a {@link DataSize} representing the specified number of gigabytes.
-	 * @param gigaBytes the number of gigabytes, positive or negative
+	 * @param gigabytes the number of gigabytes, positive or negative
 	 * @return a {@link DataSize}
 	 */
-	public static DataSize ofGigaBytes(long gigaBytes) {
-		return new DataSize(Math.multiplyExact(gigaBytes, BYTES_PER_GB));
+	public static DataSize ofGigabytes(long gigabytes) {
+		return new DataSize(Math.multiplyExact(gigabytes, BYTES_PER_GB));
 	}
 
 	/**
 	 * Obtain a {@link DataSize} representing the specified number of terabytes.
-	 * @param teraBytes the number of terabytes, positive or negative
+	 * @param terabytes the number of terabytes, positive or negative
 	 * @return a {@link DataSize}
 	 */
-	public static DataSize ofTeraBytes(long teraBytes) {
-		return new DataSize(Math.multiplyExact(teraBytes, BYTES_PER_TB));
+	public static DataSize ofTerabytes(long terabytes) {
+		return new DataSize(Math.multiplyExact(terabytes, BYTES_PER_TB));
 	}
 
 	/**
@@ -146,7 +163,7 @@ public final class DataSize implements Comparable<DataSize> {
 	 * the specified default {@link DataUnit} if no unit is specified.
 	 * <p>
 	 * The string starts with a number followed optionally by a unit matching one of the
-	 * supported {@link DataUnit suffixes}.
+	 * supported {@linkplain DataUnit suffixes}.
 	 * <p>
 	 * Examples:
 	 * <pre>
@@ -196,7 +213,7 @@ public final class DataSize implements Comparable<DataSize> {
 	 * Return the number of kilobytes in this instance.
 	 * @return the number of kilobytes
 	 */
-	public long toKiloBytes() {
+	public long toKilobytes() {
 		return this.bytes / BYTES_PER_KB;
 	}
 
@@ -204,7 +221,7 @@ public final class DataSize implements Comparable<DataSize> {
 	 * Return the number of megabytes in this instance.
 	 * @return the number of megabytes
 	 */
-	public long toMegaBytes() {
+	public long toMegabytes() {
 		return this.bytes / BYTES_PER_MB;
 	}
 
@@ -212,7 +229,7 @@ public final class DataSize implements Comparable<DataSize> {
 	 * Return the number of gigabytes in this instance.
 	 * @return the number of gigabytes
 	 */
-	public long toGigaBytes() {
+	public long toGigabytes() {
 		return this.bytes / BYTES_PER_GB;
 	}
 
@@ -220,7 +237,7 @@ public final class DataSize implements Comparable<DataSize> {
 	 * Return the number of terabytes in this instance.
 	 * @return the number of terabytes
 	 */
-	public long toTeraBytes() {
+	public long toTerabytes() {
 		return this.bytes / BYTES_PER_TB;
 	}
 
@@ -236,7 +253,7 @@ public final class DataSize implements Comparable<DataSize> {
 
 
 	@Override
-	public boolean equals(Object other) {
+	public boolean equals(@Nullable Object other) {
 		if (this == other) {
 			return true;
 		}
