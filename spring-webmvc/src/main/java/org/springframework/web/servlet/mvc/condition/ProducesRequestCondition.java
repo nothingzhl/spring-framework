@@ -22,11 +22,13 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.http.MediaType;
 import org.springframework.lang.Nullable;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.MimeType;
+import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.HttpMediaTypeException;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
@@ -96,11 +98,33 @@ public final class ProducesRequestCondition extends AbstractRequestCondition<Pro
 	public ProducesRequestCondition(String[] produces, @Nullable String[] headers,
 			@Nullable ContentNegotiationManager manager) {
 
-		this.expressions = new ArrayList<>(parseExpressions(produces, headers));
+		this.expressions = parseExpressions(produces, headers);
 		if (this.expressions.size() > 1) {
 			Collections.sort(this.expressions);
 		}
 		this.contentNegotiationManager = manager != null ? manager : DEFAULT_CONTENT_NEGOTIATION_MANAGER;
+	}
+
+	private List<ProduceMediaTypeExpression> parseExpressions(String[] produces, @Nullable String[] headers) {
+		Set<ProduceMediaTypeExpression> result = null;
+		if (!ObjectUtils.isEmpty(headers)) {
+			for (String header : headers) {
+				HeaderExpression expr = new HeaderExpression(header);
+				if ("Accept".equalsIgnoreCase(expr.name) && expr.value != null) {
+					for (MediaType mediaType : MediaType.parseMediaTypes(expr.value)) {
+						result = (result != null ? result : new LinkedHashSet<>());
+						result.add(new ProduceMediaTypeExpression(mediaType, expr.isNegated));
+					}
+				}
+			}
+		}
+		if (!ObjectUtils.isEmpty(produces)) {
+			for (String produce : produces) {
+				result = (result != null ? result : new LinkedHashSet<>());
+				result.add(new ProduceMediaTypeExpression(produce));
+			}
+		}
+		return (result != null ? new ArrayList<>(result) : Collections.emptyList());
 	}
 
 	/**
@@ -112,24 +136,6 @@ public final class ProducesRequestCondition extends AbstractRequestCondition<Pro
 		this.contentNegotiationManager = other.contentNegotiationManager;
 	}
 
-
-	private Set<ProduceMediaTypeExpression> parseExpressions(String[] produces, @Nullable String[] headers) {
-		Set<ProduceMediaTypeExpression> result = new LinkedHashSet<>();
-		if (headers != null) {
-			for (String header : headers) {
-				HeaderExpression expr = new HeaderExpression(header);
-				if ("Accept".equalsIgnoreCase(expr.name) && expr.value != null) {
-					for (MediaType mediaType : MediaType.parseMediaTypes(expr.value)) {
-						result.add(new ProduceMediaTypeExpression(mediaType, expr.isNegated));
-					}
-				}
-			}
-		}
-		for (String produce : produces) {
-			result.add(new ProduceMediaTypeExpression(produce));
-		}
-		return result;
-	}
 
 	/**
 	 * Return the contained "produces" expressions.
@@ -233,13 +239,14 @@ public final class ProducesRequestCondition extends AbstractRequestCondition<Pro
 	 * Compares this and another "produces" condition as follows:
 	 * <ol>
 	 * <li>Sort 'Accept' header media types by quality value via
-	 * {@link MediaType#sortByQualityValue(List)} and iterate the list.
+	 * {@link org.springframework.util.MimeTypeUtils#sortBySpecificity(List)}
+	 * and iterate the list.
 	 * <li>Get the first index of matching media types in each "produces"
 	 * condition first matching with {@link MediaType#equals(Object)} and
 	 * then with {@link MediaType#includes(MediaType)}.
 	 * <li>If a lower index is found, the condition at that index wins.
 	 * <li>If both indexes are equal, the media types at the index are
-	 * compared further with {@link MediaType#SPECIFICITY_COMPARATOR}.
+	 * compared further with {@link MediaType#isMoreSpecific(MimeType)}.
 	 * </ol>
 	 * <p>It is assumed that both instances have been obtained via
 	 * {@link #getMatchingCondition(HttpServletRequest)} and each instance

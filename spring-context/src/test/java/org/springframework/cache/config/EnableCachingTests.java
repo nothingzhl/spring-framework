@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,9 +18,10 @@ package org.springframework.cache.config;
 
 import org.junit.jupiter.api.Test;
 
-import org.springframework.beans.factory.BeanCreationException;
+import org.springframework.beans.factory.NoSuchBeanDefinitionException;
+import org.springframework.beans.factory.NoUniqueBeanDefinitionException;
 import org.springframework.cache.CacheManager;
-import org.springframework.cache.annotation.CachingConfigurerSupport;
+import org.springframework.cache.annotation.CachingConfigurer;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.interceptor.CacheErrorHandler;
 import org.springframework.cache.interceptor.CacheInterceptor;
@@ -87,6 +88,7 @@ public class EnableCachingTests extends AbstractCacheAnnotationTests {
 		}
 		catch (IllegalStateException ex) {
 			assertThat(ex.getMessage().contains("no unique bean of type CacheManager")).isTrue();
+			assertThat(ex).hasCauseInstanceOf(NoUniqueBeanDefinitionException.class);
 		}
 	}
 
@@ -104,11 +106,8 @@ public class EnableCachingTests extends AbstractCacheAnnotationTests {
 		try {
 			ctx.refresh();
 		}
-		catch (BeanCreationException ex) {
-			Throwable root = ex.getRootCause();
-			boolean condition = root instanceof IllegalStateException;
-			assertThat(condition).isTrue();
-			assertThat(root.getMessage().contains("implementations of CachingConfigurer")).isTrue();
+		catch (IllegalStateException ex) {
+			assertThat(ex.getMessage().contains("implementations of CachingConfigurer")).isTrue();
 		}
 	}
 
@@ -121,6 +120,7 @@ public class EnableCachingTests extends AbstractCacheAnnotationTests {
 		}
 		catch (IllegalStateException ex) {
 			assertThat(ex.getMessage().contains("no bean of type CacheManager")).isTrue();
+			assertThat(ex).hasCauseInstanceOf(NoSuchBeanDefinitionException.class);
 		}
 	}
 
@@ -146,7 +146,7 @@ public class EnableCachingTests extends AbstractCacheAnnotationTests {
 
 	@Configuration
 	@EnableCaching
-	static class EnableCachingConfig extends CachingConfigurerSupport {
+	static class EnableCachingConfig implements CachingConfigurer {
 
 		@Override
 		@Bean
@@ -223,7 +223,7 @@ public class EnableCachingTests extends AbstractCacheAnnotationTests {
 
 	@Configuration
 	@EnableCaching
-	static class MultiCacheManagerConfigurer extends CachingConfigurerSupport {
+	static class MultiCacheManagerConfigurer implements CachingConfigurer {
 
 		@Bean
 		public CacheManager cm1() {
@@ -249,7 +249,7 @@ public class EnableCachingTests extends AbstractCacheAnnotationTests {
 
 	@Configuration
 	@EnableCaching
-	static class EmptyConfigSupportConfig extends CachingConfigurerSupport {
+	static class EmptyConfigSupportConfig implements CachingConfigurer {
 
 		@Bean
 		public CacheManager cm() {
@@ -260,7 +260,7 @@ public class EnableCachingTests extends AbstractCacheAnnotationTests {
 
 	@Configuration
 	@EnableCaching
-	static class FullCachingConfig extends CachingConfigurerSupport {
+	static class FullCachingConfig implements CachingConfigurer {
 
 		@Override
 		@Bean

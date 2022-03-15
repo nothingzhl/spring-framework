@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,11 +20,10 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 
-import io.reactivex.Single;
+import io.reactivex.rxjava3.core.Single;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
@@ -72,7 +71,7 @@ public class DefaultEntityResponseBuilderTests {
 	@Test
 	public void fromPublisher() {
 		Flux<String> body = Flux.just("foo", "bar");
-		ParameterizedTypeReference<String> typeReference = new ParameterizedTypeReference<String>() {};
+		ParameterizedTypeReference<String> typeReference = new ParameterizedTypeReference<>() {};
 		EntityResponse<Flux<String>> response = EntityResponse.fromPublisher(body, typeReference).build().block();
 		assertThat(response.entity()).isSameAs(body);
 	}
@@ -80,7 +79,7 @@ public class DefaultEntityResponseBuilderTests {
 	@Test
 	public void fromProducer() {
 		Single<String> body = Single.just("foo");
-		ParameterizedTypeReference<String> typeReference = new ParameterizedTypeReference<String>() {};
+		ParameterizedTypeReference<String> typeReference = new ParameterizedTypeReference<>() {};
 		EntityResponse<Single<String>> response = EntityResponse.fromProducer(body, typeReference).build().block();
 		assertThat(response.entity()).isSameAs(body);
 	}
@@ -100,7 +99,7 @@ public class DefaultEntityResponseBuilderTests {
 	public void allow() {
 		String body = "foo";
 		Mono<EntityResponse<String>> result = EntityResponse.fromObject(body).allow(HttpMethod.GET).build();
-		Set<HttpMethod> expected = EnumSet.of(HttpMethod.GET);
+		Set<HttpMethod> expected = Set.of(HttpMethod.GET);
 		StepVerifier.create(result)
 				.expectNextMatches(response -> expected.equals(response.headers().getAllow()))
 				.expectComplete()

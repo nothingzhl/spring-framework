@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ import javax.script.ScriptEngine;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledForJreRange;
 
 import org.springframework.beans.DirectFieldAccessor;
 import org.springframework.context.ApplicationContextException;
@@ -46,6 +47,8 @@ import org.springframework.web.testfixture.servlet.MockServletContext;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
+import static org.assertj.core.api.InstanceOfAssertFactories.BOOLEAN;
+import static org.junit.jupiter.api.condition.JRE.JAVA_15;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
@@ -55,6 +58,7 @@ import static org.mockito.Mockito.mock;
  *
  * @author Sebastien Deleuze
  */
+@DisabledForJreRange(min = JAVA_15) // Nashorn JavaScript engine removed in Java 15
 public class ScriptTemplateViewTests {
 
 	private ScriptTemplateView view;
@@ -110,7 +114,7 @@ public class ScriptTemplateViewTests {
 		assertThat(accessor.getPropertyValue("renderFunction")).isEqualTo("render");
 		assertThat(accessor.getPropertyValue("contentType")).isEqualTo(MediaType.TEXT_PLAIN_VALUE);
 		assertThat(accessor.getPropertyValue("charset")).isEqualTo(StandardCharsets.ISO_8859_1);
-		assertThat(accessor.getPropertyValue("sharedEngine")).isEqualTo(true);
+		assertThat(accessor.getPropertyValue("sharedEngine")).asInstanceOf(BOOLEAN).isTrue();
 	}
 
 	@Test
@@ -298,10 +302,9 @@ public class ScriptTemplateViewTests {
 		assertThat(engine2).isNotNull();
 		assertThat(accessor.getPropertyValue("renderObject")).isEqualTo("Template");
 		assertThat(accessor.getPropertyValue("renderFunction")).isEqualTo("render");
-		assertThat(accessor.getPropertyValue("sharedEngine")).isEqualTo(true);
+		assertThat(accessor.getPropertyValue("sharedEngine")).asInstanceOf(BOOLEAN).isTrue();
 	}
 
-	@SuppressWarnings("unchecked")
 	@Test  // gh-23258
 	public void engineSupplierWithNonSharedEngine() {
 		this.configurer.setEngineSupplier(() -> mock(InvocableScriptEngine.class));
@@ -317,7 +320,7 @@ public class ScriptTemplateViewTests {
 		assertThat(engine2).isNotNull();
 		assertThat(accessor.getPropertyValue("renderObject")).isEqualTo("Template");
 		assertThat(accessor.getPropertyValue("renderFunction")).isEqualTo("render");
-		assertThat(accessor.getPropertyValue("sharedEngine")).isEqualTo(false);
+		assertThat(accessor.getPropertyValue("sharedEngine")).asInstanceOf(BOOLEAN).isFalse();
 	}
 
 	private interface InvocableScriptEngine extends ScriptEngine, Invocable {

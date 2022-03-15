@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,8 +35,7 @@ import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import javax.annotation.Resource;
-
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.core.Ordered;
@@ -50,8 +49,10 @@ import org.springframework.util.ClassUtils;
 import org.springframework.util.MultiValueMap;
 import org.springframework.util.ReflectionUtils;
 
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.assertj.core.api.Assertions.entry;
 
@@ -71,6 +72,26 @@ import static org.assertj.core.api.Assertions.entry;
  * @see MergedAnnotationClassLoaderTests
  */
 class MergedAnnotationsTests {
+
+	@Test
+	void fromPreconditions() {
+		SearchStrategy strategy = SearchStrategy.DIRECT;
+		RepeatableContainers containers = RepeatableContainers.standardRepeatables();
+
+		assertThatIllegalArgumentException()
+			.isThrownBy(() -> MergedAnnotations.from(getClass(), strategy, null, AnnotationFilter.PLAIN))
+			.withMessage("RepeatableContainers must not be null");
+		assertThatIllegalArgumentException()
+			.isThrownBy(() -> MergedAnnotations.from(getClass(), strategy, containers, null))
+			.withMessage("AnnotationFilter must not be null");
+
+		assertThatIllegalArgumentException()
+			.isThrownBy(() -> MergedAnnotations.from(getClass(), new Annotation[0], null, AnnotationFilter.PLAIN))
+			.withMessage("RepeatableContainers must not be null");
+		assertThatIllegalArgumentException()
+			.isThrownBy(() -> MergedAnnotations.from(getClass(), new Annotation[0], containers, null))
+			.withMessage("AnnotationFilter must not be null");
+	}
 
 	@Test
 	void streamWhenFromNonAnnotatedClass() {
@@ -690,19 +711,6 @@ class MergedAnnotationsTests {
 	}
 
 	@Test
-	void streamTypeHierarchyAndEnclosingClassesFromNonAnnotatedInnerClassWithAnnotatedEnclosingClass() {
-		Stream<Class<?>> classes = MergedAnnotations.from(AnnotatedClass.NonAnnotatedInnerClass.class,
-				SearchStrategy.TYPE_HIERARCHY_AND_ENCLOSING_CLASSES).stream().map(MergedAnnotation::getType);
-		assertThat(classes).containsExactly(Component.class, Indexed.class);
-	}
-
-	@Test
-	void streamTypeHierarchyAndEnclosingClassesFromNonAnnotatedStaticNestedClassWithAnnotatedEnclosingClass() {
-		Stream<Class<?>> classes = MergedAnnotations.from(AnnotatedClass.NonAnnotatedStaticNestedClass.class,
-				SearchStrategy.TYPE_HIERARCHY_AND_ENCLOSING_CLASSES).stream().map(MergedAnnotation::getType);
-		assertThat(classes).containsExactly(Component.class, Indexed.class);
-	}
-	@Test
 	void getFromMethodWithMethodAnnotationOnLeaf() throws Exception {
 		Method method = Leaf.class.getMethod("annotatedOnLeaf");
 		assertThat(method.getAnnotation(Order.class)).isNotNull();
@@ -776,24 +784,19 @@ class MergedAnnotationsTests {
 
 	@Test
 	void getFromMethodWithBridgeMethod() throws Exception {
-		Method method = TransactionalStringGeneric.class.getMethod("something",
-				Object.class);
+		Method method = TransactionalStringGeneric.class.getMethod("something", Object.class);
 		assertThat(method.isBridge()).isTrue();
 		assertThat(method.getAnnotation(Order.class)).isNull();
-		assertThat(MergedAnnotations.from(method).get(Order.class).getDistance()).isEqualTo(
-				-1);
+		assertThat(MergedAnnotations.from(method).get(Order.class).getDistance()).isEqualTo(-1);
 		assertThat(MergedAnnotations.from(method, SearchStrategy.TYPE_HIERARCHY).get(
 				Order.class).getDistance()).isEqualTo(0);
 		boolean runningInEclipse = Arrays.stream(
 				new Exception().getStackTrace()).anyMatch(
 						element -> element.getClassName().startsWith("org.eclipse.jdt"));
-		// As of JDK 8, invoking getAnnotation() on a bridge method actually
-		// finds an
+		// As of JDK 8, invoking getAnnotation() on a bridge method actually finds an
 		// annotation on its 'bridged' method [1]; however, the Eclipse compiler
-		// will not
-		// support this until Eclipse 4.9 [2]. Thus, we effectively ignore the
-		// following
-		// assertion if the test is currently executing within the Eclipse IDE.
+		// will not support this until Eclipse 4.9 [2]. Thus, we effectively ignore the
+		// following assertion if the test is currently executing within the Eclipse IDE.
 		// [1] https://bugs.openjdk.java.net/browse/JDK-6695379
 		// [2] https://bugs.eclipse.org/bugs/show_bug.cgi?id=495396
 		if (!runningInEclipse) {
@@ -843,8 +846,7 @@ class MergedAnnotationsTests {
 
 	@Test
 	void getFromMethodWithInterfaceOnSuper() throws Exception {
-		Method method = SubOfImplementsInterfaceWithAnnotatedMethod.class.getMethod(
-				"foo");
+		Method method = SubOfImplementsInterfaceWithAnnotatedMethod.class.getMethod("foo");
 		assertThat(MergedAnnotations.from(method, SearchStrategy.TYPE_HIERARCHY).get(
 				Order.class).getDistance()).isEqualTo(0);
 	}
@@ -1257,6 +1259,7 @@ class MergedAnnotationsTests {
 	}
 
 	@Test
+	@SuppressWarnings("deprecation")
 	void getRepeatableDeclaredOnClassWithAttributeAliases() {
 		assertThat(MergedAnnotations.from(HierarchyClass.class).stream(
 				TestConfiguration.class)).isEmpty();
@@ -1369,14 +1372,68 @@ class MergedAnnotationsTests {
 		Method method = WebController.class.getMethod("handleMappedWithValueAttribute");
 		RequestMapping webMapping = method.getAnnotation(RequestMapping.class);
 		assertThat(webMapping).isNotNull();
+
 		RequestMapping synthesizedWebMapping = MergedAnnotation.from(webMapping).synthesize();
 		RequestMapping synthesizedAgainWebMapping = MergedAnnotation.from(synthesizedWebMapping).synthesize();
+
 		assertThat(synthesizedWebMapping).isInstanceOf(SynthesizedAnnotation.class);
 		assertThat(synthesizedAgainWebMapping).isInstanceOf(SynthesizedAnnotation.class);
 		assertThat(synthesizedWebMapping).isEqualTo(synthesizedAgainWebMapping);
 		assertThat(synthesizedWebMapping.name()).isEqualTo("foo");
 		assertThat(synthesizedWebMapping.path()).containsExactly("/test");
 		assertThat(synthesizedWebMapping.value()).containsExactly("/test");
+	}
+
+	@Test
+	void synthesizeShouldNotSynthesizeNonsynthesizableAnnotations() throws Exception {
+		Method method = getClass().getDeclaredMethod("getId");
+
+		Id id = method.getAnnotation(Id.class);
+		assertThat(id).isNotNull();
+		Id synthesizedId = MergedAnnotation.from(id).synthesize();
+		assertThat(id).isEqualTo(synthesizedId);
+		// It doesn't make sense to synthesize @Id since it declares zero attributes.
+		assertThat(synthesizedId).isNotInstanceOf(SynthesizedAnnotation.class);
+		assertThat(id).isSameAs(synthesizedId);
+
+		GeneratedValue generatedValue = method.getAnnotation(GeneratedValue.class);
+		assertThat(generatedValue).isNotNull();
+		GeneratedValue synthesizedGeneratedValue = MergedAnnotation.from(generatedValue).synthesize();
+		assertThat(generatedValue).isEqualTo(synthesizedGeneratedValue);
+		// It doesn't make sense to synthesize @GeneratedValue since it declares zero attributes with aliases.
+		assertThat(synthesizedGeneratedValue).isNotInstanceOf(SynthesizedAnnotation.class);
+		assertThat(generatedValue).isSameAs(synthesizedGeneratedValue);
+	}
+
+	/**
+	 * If an attempt is made to synthesize an annotation from an annotation instance
+	 * that has already been synthesized, the original synthesized annotation should
+	 * ideally be returned as-is without creating a new proxy instance with the same
+	 * values.
+	 */
+	@Test
+	void synthesizeShouldNotResynthesizeAlreadySynthesizedAnnotations() throws Exception {
+		Method method = WebController.class.getMethod("handleMappedWithValueAttribute");
+		RequestMapping webMapping = method.getAnnotation(RequestMapping.class);
+		assertThat(webMapping).isNotNull();
+
+		MergedAnnotation<RequestMapping> mergedAnnotation1 = MergedAnnotation.from(webMapping);
+		RequestMapping synthesizedWebMapping1 = mergedAnnotation1.synthesize();
+		RequestMapping synthesizedWebMapping2 = MergedAnnotation.from(webMapping).synthesize();
+
+		assertThat(synthesizedWebMapping1).isInstanceOf(SynthesizedAnnotation.class);
+		assertThat(synthesizedWebMapping2).isInstanceOf(SynthesizedAnnotation.class);
+		assertThat(synthesizedWebMapping1).isEqualTo(synthesizedWebMapping2);
+
+		// Synthesizing an annotation from a different MergedAnnotation results in a different synthesized annotation instance.
+		assertThat(synthesizedWebMapping1).isNotSameAs(synthesizedWebMapping2);
+		// Synthesizing an annotation from the same MergedAnnotation results in the same synthesized annotation instance.
+		assertThat(synthesizedWebMapping1).isSameAs(mergedAnnotation1.synthesize());
+
+		RequestMapping synthesizedAgainWebMapping = MergedAnnotation.from(synthesizedWebMapping1).synthesize();
+		assertThat(synthesizedWebMapping1).isEqualTo(synthesizedAgainWebMapping);
+		// Synthesizing an already synthesized annotation results in the original synthesized annotation instance.
+		assertThat(synthesizedWebMapping1).isSameAs(synthesizedAgainWebMapping);
 	}
 
 	@Test
@@ -1628,7 +1685,7 @@ class MergedAnnotationsTests {
 		assertThat(componentScan).isNotNull();
 		assertThat(componentScan.value().pattern()).isEqualTo("*Foo");
 		Map<String, Object> map = MergedAnnotation.from(componentScan).asMap(
-				annotation -> new LinkedHashMap<String, Object>(),
+				annotation -> new LinkedHashMap<>(),
 				Adapt.ANNOTATION_TO_MAP);
 		Map<String, Object> filterMap = (Map<String, Object>) map.get("value");
 		assertThat(filterMap.get("pattern")).isEqualTo("*Foo");
@@ -1648,7 +1705,7 @@ class MergedAnnotationsTests {
 				ComponentScan.class);
 		assertThat(componentScan).isNotNull();
 		Map<String, Object> map = MergedAnnotation.from(componentScan).asMap(
-				annotation -> new LinkedHashMap<String, Object>(),
+				annotation -> new LinkedHashMap<>(),
 				Adapt.ANNOTATION_TO_MAP);
 		Map<String, Object>[] filters = (Map[]) map.get("excludeFilters");
 		List<String> patterns = Arrays.stream(filters).map(
@@ -1789,20 +1846,52 @@ class MergedAnnotationsTests {
 		Method methodWithPath = WebController.class.getMethod("handleMappedWithPathAttribute");
 		RequestMapping webMappingWithAliases = methodWithPath.getAnnotation(RequestMapping.class);
 		assertThat(webMappingWithAliases).isNotNull();
+
 		Method methodWithPathAndValue = WebController.class.getMethod("handleMappedWithSamePathAndValueAttributes");
 		RequestMapping webMappingWithPathAndValue = methodWithPathAndValue.getAnnotation(RequestMapping.class);
 		assertThat(methodWithPathAndValue).isNotNull();
+
 		RequestMapping synthesizedWebMapping1 = MergedAnnotation.from(webMappingWithAliases).synthesize();
 		RequestMapping synthesizedWebMapping2 = MergedAnnotation.from(webMappingWithPathAndValue).synthesize();
+
 		assertThat(webMappingWithAliases.toString()).isNotEqualTo(synthesizedWebMapping1.toString());
+
+		// The unsynthesized annotation for handleMappedWithSamePathAndValueAttributes()
+		// should produce almost the same toString() results as synthesized annotations for
+		// handleMappedWithPathAttribute() on Java 9 or higher; however, due to multiple changes
+		// in the JDK's toString() implementation for annotations in JDK 9, 14, and 19,
+		// we do not test the JDK implementation.
+		// assertToStringForWebMappingWithPathAndValue(webMappingWithPathAndValue);
+
 		assertToStringForWebMappingWithPathAndValue(synthesizedWebMapping1);
 		assertToStringForWebMappingWithPathAndValue(synthesizedWebMapping2);
 	}
 
 	private void assertToStringForWebMappingWithPathAndValue(RequestMapping webMapping) {
-		String prefix = "@" + RequestMapping.class.getName() + "(";
-		assertThat(webMapping.toString()).startsWith(prefix).contains("value=[/test]",
-				"path=[/test]", "name=bar", "method=", "[GET, POST]").endsWith(")");
+		assertThat(webMapping.toString())
+			.startsWith("@org.springframework.core.annotation.MergedAnnotationsTests.RequestMapping(")
+			.contains(
+				// Strings
+				"value={\"/test\"}", "path={\"/test\"}", "name=\"bar\"",
+				// Characters
+				"ch='X'", "chars={'X'}",
+				// Enums
+				"method={GET, POST}",
+				// Classes
+				"clazz=org.springframework.core.annotation.MergedAnnotationsTests.RequestMethod.class",
+				"classes={int[][].class, org.springframework.core.annotation.MergedAnnotationsTests.RequestMethod[].class}",
+				// Bytes
+				"byteValue=(byte) 0xFF", "bytes={(byte) 0xFF}",
+				// Shorts
+				"shortValue=9876", "shorts={9876}",
+				// Longs
+				"longValue=42L", "longs={42L}",
+				// Floats
+				"floatValue=3.14f", "floats={3.14f}",
+				// Doubles
+				"doubleValue=99.999d", "doubles={99.999d}"
+			)
+			.endsWith(")");
 	}
 
 	@Test
@@ -1914,7 +2003,7 @@ class MergedAnnotationsTests {
 	}
 
 	@Test
-	void synthesizeWithAttributeAliasesInNestedAnnotations() throws Exception {
+	void synthesizeWithArrayOfAnnotations() throws Exception {
 		Hierarchy hierarchy = HierarchyClass.class.getAnnotation(Hierarchy.class);
 		assertThat(hierarchy).isNotNull();
 		Hierarchy synthesizedHierarchy = MergedAnnotation.from(hierarchy).synthesize();
@@ -1922,33 +2011,17 @@ class MergedAnnotationsTests {
 		TestConfiguration[] configs = synthesizedHierarchy.value();
 		assertThat(configs).isNotNull();
 		assertThat(configs).allMatch(SynthesizedAnnotation.class::isInstance);
-		assertThat(
-				Arrays.stream(configs).map(TestConfiguration::location)).containsExactly(
-						"A", "B");
-		assertThat(Arrays.stream(configs).map(TestConfiguration::value)).containsExactly(
-				"A", "B");
-	}
+		assertThat(configs).extracting(TestConfiguration::value).containsExactly("A", "B");
+		assertThat(configs).extracting(TestConfiguration::location).containsExactly("A", "B");
 
-	@Test
-	void synthesizeWithArrayOfAnnotations() throws Exception {
-		Hierarchy hierarchy = HierarchyClass.class.getAnnotation(Hierarchy.class);
-		assertThat(hierarchy).isNotNull();
-		Hierarchy synthesizedHierarchy = MergedAnnotation.from(hierarchy).synthesize();
-		assertThat(synthesizedHierarchy).isInstanceOf(SynthesizedAnnotation.class);
-		TestConfiguration contextConfig = TestConfigurationClass.class.getAnnotation(
-				TestConfiguration.class);
+		TestConfiguration contextConfig = TestConfigurationClass.class.getAnnotation(TestConfiguration.class);
 		assertThat(contextConfig).isNotNull();
-		TestConfiguration[] configs = synthesizedHierarchy.value();
-		assertThat(
-				Arrays.stream(configs).map(TestConfiguration::location)).containsExactly(
-						"A", "B");
 		// Alter array returned from synthesized annotation
 		configs[0] = contextConfig;
+		assertThat(configs).extracting(TestConfiguration::value).containsExactly("simple.xml", "B");
 		// Re-retrieve the array from the synthesized annotation
 		configs = synthesizedHierarchy.value();
-		assertThat(
-				Arrays.stream(configs).map(TestConfiguration::location)).containsExactly(
-						"A", "B");
+		assertThat(configs).extracting(TestConfiguration::value).containsExactly("A", "B");
 	}
 
 	@Test
@@ -2885,7 +2958,17 @@ class MergedAnnotationsTests {
 	}
 
 	enum RequestMethod {
-		GET, POST
+		GET,
+
+		POST;
+
+		/**
+		 * custom override to verify annotation toString() implementations.
+		 */
+		@Override
+		public String toString() {
+			return "method: " + name().toLowerCase();
+		}
 	}
 
 	@Retention(RetentionPolicy.RUNTIME)
@@ -2900,6 +2983,30 @@ class MergedAnnotationsTests {
 		String[] path() default "";
 
 		RequestMethod[] method() default {};
+
+		// ---------------------------------------------------------------------
+		// All remaining attributes declare default values that are used solely
+		// for the purpose of testing the toString() implementations for annotations.
+		Class<?> clazz() default RequestMethod.class;
+		Class<?>[] classes() default {int[][].class, RequestMethod[].class};
+
+		char ch() default 'X';
+		char[] chars() default {'X'};
+
+		byte byteValue() default (byte) 0xFF;
+		byte[] bytes() default {(byte) 0xFF};
+
+		short shortValue() default 9876;
+		short[] shorts() default {9876};
+
+		long longValue() default 42L;
+		long[] longs() default {42L};
+
+		float floatValue() default 3.14F;
+		float[] floats() default {3.14F};
+
+		double doubleValue() default 99.999D;
+		double[] doubles() default {99.999D};
 	}
 
 	@Retention(RetentionPolicy.RUNTIME)
@@ -2952,6 +3059,27 @@ class MergedAnnotationsTests {
 		@RequestMapping(value = "/enigma", path = "/test", name = "baz")
 		public void handleMappedWithDifferentPathAndValueAttributes() {
 		}
+	}
+
+	/**
+	 * Mimics jakarta.persistence.Id
+	 */
+	@Retention(RUNTIME)
+	@interface Id {
+	}
+
+	/**
+	 * Mimics jakarta.persistence.GeneratedValue
+	 */
+	@Retention(RUNTIME)
+	@interface GeneratedValue {
+		String strategy();
+	}
+
+	@Id
+	@GeneratedValue(strategy = "AUTO")
+	private Long getId() {
+		return 42L;
 	}
 
 	@Retention(RetentionPolicy.RUNTIME)
