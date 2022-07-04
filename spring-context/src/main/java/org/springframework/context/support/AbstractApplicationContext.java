@@ -16,21 +16,8 @@
 
 package org.springframework.context.support;
 
-import java.io.IOException;
-import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Date;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.beans.BeansException;
 import org.springframework.beans.CachedIntrospectionResults;
 import org.springframework.beans.factory.BeanFactory;
@@ -39,29 +26,8 @@ import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
 import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.support.ResourceEditorRegistrar;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.ApplicationContextAware;
-import org.springframework.context.ApplicationEvent;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.context.ApplicationEventPublisherAware;
-import org.springframework.context.ApplicationListener;
-import org.springframework.context.ConfigurableApplicationContext;
-import org.springframework.context.EmbeddedValueResolverAware;
-import org.springframework.context.EnvironmentAware;
-import org.springframework.context.HierarchicalMessageSource;
-import org.springframework.context.LifecycleProcessor;
-import org.springframework.context.MessageSource;
-import org.springframework.context.MessageSourceAware;
-import org.springframework.context.MessageSourceResolvable;
-import org.springframework.context.NoSuchMessageException;
-import org.springframework.context.PayloadApplicationEvent;
-import org.springframework.context.ResourceLoaderAware;
-import org.springframework.context.event.ApplicationEventMulticaster;
-import org.springframework.context.event.ContextClosedEvent;
-import org.springframework.context.event.ContextRefreshedEvent;
-import org.springframework.context.event.ContextStartedEvent;
-import org.springframework.context.event.ContextStoppedEvent;
-import org.springframework.context.event.SimpleApplicationEventMulticaster;
+import org.springframework.context.*;
+import org.springframework.context.event.*;
 import org.springframework.context.expression.StandardBeanExpressionResolver;
 import org.springframework.context.weaving.LoadTimeWeaverAware;
 import org.springframework.context.weaving.LoadTimeWeaverAwareProcessor;
@@ -80,6 +46,11 @@ import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.ReflectionUtils;
+
+import java.io.IOException;
+import java.lang.annotation.Annotation;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Abstract implementation of the {@link org.springframework.context.ApplicationContext}
@@ -159,58 +130,42 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 
 	/** Logger used by this class. Available to subclasses. */
 	protected final Log logger = LogFactory.getLog(getClass());
-
+	/** BeanFactoryPostProcessors to apply on refresh */
+	private final List<BeanFactoryPostProcessor> beanFactoryPostProcessors = new ArrayList<>();
+	/** Flag that indicates whether this context is currently active */
+	private final AtomicBoolean active = new AtomicBoolean();
+	/** Flag that indicates whether this context has been closed already */
+	private final AtomicBoolean closed = new AtomicBoolean();
+	/** Synchronization monitor for the "refresh" and "destroy" */
+	private final Object startupShutdownMonitor = new Object();
+	/** Statically specified listeners */
+	private final Set<ApplicationListener<?>> applicationListeners = new LinkedHashSet<>();
 	/** Unique id for this context, if any */
 	private String id = ObjectUtils.identityToString(this);
-
 	/** Display name */
 	private String displayName = ObjectUtils.identityToString(this);
-
 	/** Parent context */
 	@Nullable
 	private ApplicationContext parent;
-
 	/** Environment used by this context */
 	@Nullable
 	private ConfigurableEnvironment environment;
-
-	/** BeanFactoryPostProcessors to apply on refresh */
-	private final List<BeanFactoryPostProcessor> beanFactoryPostProcessors = new ArrayList<>();
-
 	/** System time in milliseconds when this context started */
 	private long startupDate;
-
-	/** Flag that indicates whether this context is currently active */
-	private final AtomicBoolean active = new AtomicBoolean();
-
-	/** Flag that indicates whether this context has been closed already */
-	private final AtomicBoolean closed = new AtomicBoolean();
-
-	/** Synchronization monitor for the "refresh" and "destroy" */
-	private final Object startupShutdownMonitor = new Object();
-
 	/** Reference to the JVM shutdown hook, if registered */
 	@Nullable
 	private Thread shutdownHook;
-
 	/** ResourcePatternResolver used by this context */
 	private ResourcePatternResolver resourcePatternResolver;
-
 	/** LifecycleProcessor for managing the lifecycle of beans within this context */
 	@Nullable
 	private LifecycleProcessor lifecycleProcessor;
-
 	/** MessageSource we delegate our implementation of this interface to */
 	@Nullable
 	private MessageSource messageSource;
-
 	/** Helper class used in event publishing */
 	@Nullable
 	private ApplicationEventMulticaster applicationEventMulticaster;
-
-	/** Statically specified listeners */
-	private final Set<ApplicationListener<?>> applicationListeners = new LinkedHashSet<>();
-
 	/** ApplicationEvents published early */
 	@Nullable
 	private Set<ApplicationEvent> earlyApplicationEvents;
@@ -237,6 +192,11 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	// Implementation of ApplicationContext interface
 	//---------------------------------------------------------------------
 
+	@Override
+	public String getId() {
+		return this.id;
+	}
+
 	/**
 	 * Set the unique id of this application context.
 	 * <p>Default is the object id of the context instance, or the name
@@ -249,13 +209,17 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	}
 
 	@Override
-	public String getId() {
-		return this.id;
-	}
-
-	@Override
 	public String getApplicationName() {
 		return "";
+	}
+
+	/**
+	 * Return a friendly name for this context.
+	 * @return a display name for this context (never {@code null})
+	 */
+	@Override
+	public String getDisplayName() {
+		return this.displayName;
 	}
 
 	/**
@@ -269,15 +233,6 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	}
 
 	/**
-	 * Return a friendly name for this context.
-	 * @return a display name for this context (never {@code null})
-	 */
-	@Override
-	public String getDisplayName() {
-		return this.displayName;
-	}
-
-	/**
 	 * Return the parent context, or {@code null} if there is no parent
 	 * (that is, this context is the root of the context hierarchy).
 	 */
@@ -288,16 +243,22 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	}
 
 	/**
-	 * Set the {@code Environment} for this application context.
-	 * <p>Default value is determined by {@link #createEnvironment()}. Replacing the
-	 * default with this method is one option but configuration through {@link
-	 * #getEnvironment()} should also be considered. In either case, such modifications
-	 * should be performed <em>before</em> {@link #refresh()}.
-	 * @see org.springframework.context.support.AbstractApplicationContext#createEnvironment
+	 * Set the parent of this application context.
+	 * <p>The parent {@linkplain ApplicationContext#getEnvironment() environment} is
+	 * {@linkplain ConfigurableEnvironment#merge(ConfigurableEnvironment) merged} with
+	 * this (child) application context environment if the parent is non-{@code null} and
+	 * its environment is an instance of {@link ConfigurableEnvironment}.
+	 * @see ConfigurableEnvironment#merge(ConfigurableEnvironment)
 	 */
 	@Override
-	public void setEnvironment(ConfigurableEnvironment environment) {
-		this.environment = environment;
+	public void setParent(@Nullable ApplicationContext parent) {
+		this.parent = parent;
+		if (parent != null) {
+			Environment parentEnvironment = parent.getEnvironment();
+			if (parentEnvironment instanceof ConfigurableEnvironment) {
+				getEnvironment().merge((ConfigurableEnvironment) parentEnvironment);
+			}
+		}
 	}
 
 	/**
@@ -312,6 +273,19 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 			this.environment = createEnvironment();
 		}
 		return this.environment;
+	}
+
+	/**
+	 * Set the {@code Environment} for this application context.
+	 * <p>Default value is determined by {@link #createEnvironment()}. Replacing the
+	 * default with this method is one option but configuration through {@link
+	 * #getEnvironment()} should also be considered. In either case, such modifications
+	 * should be performed <em>before</em> {@link #refresh()}.
+	 * @see org.springframework.context.support.AbstractApplicationContext#createEnvironment
+	 */
+	@Override
+	public void setEnvironment(ConfigurableEnvironment environment) {
+		this.environment = environment;
 	}
 
 	/**
@@ -437,6 +411,11 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 		return this.lifecycleProcessor;
 	}
 
+
+	//---------------------------------------------------------------------
+	// Implementation of ConfigurableApplicationContext interface
+	//---------------------------------------------------------------------
+
 	/**
 	 * Return the ResourcePatternResolver to use for resolving location patterns
 	 * into Resource instances. Default is a
@@ -453,30 +432,6 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	 */
 	protected ResourcePatternResolver getResourcePatternResolver() {
 		return new PathMatchingResourcePatternResolver(this);
-	}
-
-
-	//---------------------------------------------------------------------
-	// Implementation of ConfigurableApplicationContext interface
-	//---------------------------------------------------------------------
-
-	/**
-	 * Set the parent of this application context.
-	 * <p>The parent {@linkplain ApplicationContext#getEnvironment() environment} is
-	 * {@linkplain ConfigurableEnvironment#merge(ConfigurableEnvironment) merged} with
-	 * this (child) application context environment if the parent is non-{@code null} and
-	 * its environment is an instance of {@link ConfigurableEnvironment}.
-	 * @see ConfigurableEnvironment#merge(ConfigurableEnvironment)
-	 */
-	@Override
-	public void setParent(@Nullable ApplicationContext parent) {
-		this.parent = parent;
-		if (parent != null) {
-			Environment parentEnvironment = parent.getEnvironment();
-			if (parentEnvironment instanceof ConfigurableEnvironment) {
-				getEnvironment().merge((ConfigurableEnvironment) parentEnvironment);
-			}
-		}
 	}
 
 	@Override
@@ -618,6 +573,7 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	 * @see #getBeanFactory()
 	 */
 	protected ConfigurableListableBeanFactory obtainFreshBeanFactory() {
+		// 刷新beanFactory（这个时候会创建beanFactory）
 		refreshBeanFactory();
 		ConfigurableListableBeanFactory beanFactory = getBeanFactory();
 		if (logger.isDebugEnabled()) {

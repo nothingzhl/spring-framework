@@ -16,56 +16,23 @@
 
 package org.springframework.beans.factory.xml;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.springframework.beans.BeanMetadataAttribute;
+import org.springframework.beans.BeanMetadataAttributeAccessor;
+import org.springframework.beans.PropertyValue;
+import org.springframework.beans.factory.config.*;
+import org.springframework.beans.factory.parsing.*;
+import org.springframework.beans.factory.support.*;
+import org.springframework.lang.Nullable;
+import org.springframework.util.*;
+import org.springframework.util.xml.DomUtils;
 import org.w3c.dom.Element;
 import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
-import org.springframework.beans.BeanMetadataAttribute;
-import org.springframework.beans.BeanMetadataAttributeAccessor;
-import org.springframework.beans.PropertyValue;
-import org.springframework.beans.factory.config.BeanDefinition;
-import org.springframework.beans.factory.config.BeanDefinitionHolder;
-import org.springframework.beans.factory.config.ConstructorArgumentValues;
-import org.springframework.beans.factory.config.RuntimeBeanNameReference;
-import org.springframework.beans.factory.config.RuntimeBeanReference;
-import org.springframework.beans.factory.config.TypedStringValue;
-import org.springframework.beans.factory.parsing.BeanEntry;
-import org.springframework.beans.factory.parsing.ConstructorArgumentEntry;
-import org.springframework.beans.factory.parsing.ParseState;
-import org.springframework.beans.factory.parsing.PropertyEntry;
-import org.springframework.beans.factory.parsing.QualifierEntry;
-import org.springframework.beans.factory.support.AbstractBeanDefinition;
-import org.springframework.beans.factory.support.AutowireCandidateQualifier;
-import org.springframework.beans.factory.support.BeanDefinitionDefaults;
-import org.springframework.beans.factory.support.BeanDefinitionReaderUtils;
-import org.springframework.beans.factory.support.LookupOverride;
-import org.springframework.beans.factory.support.ManagedArray;
-import org.springframework.beans.factory.support.ManagedList;
-import org.springframework.beans.factory.support.ManagedMap;
-import org.springframework.beans.factory.support.ManagedProperties;
-import org.springframework.beans.factory.support.ManagedSet;
-import org.springframework.beans.factory.support.MethodOverrides;
-import org.springframework.beans.factory.support.ReplaceOverride;
-import org.springframework.lang.Nullable;
-import org.springframework.util.Assert;
-import org.springframework.util.ClassUtils;
-import org.springframework.util.CollectionUtils;
-import org.springframework.util.ObjectUtils;
-import org.springframework.util.PatternMatchUtils;
-import org.springframework.util.StringUtils;
-import org.springframework.util.xml.DomUtils;
+import java.util.*;
 
 /**
  * Stateful delegate class used to parse XML bean definitions.
@@ -125,106 +92,55 @@ public class BeanDefinitionParserDelegate {
 	public static final String ABSTRACT_ATTRIBUTE = "abstract";
 
 	public static final String SCOPE_ATTRIBUTE = "scope";
-
-	private static final String SINGLETON_ATTRIBUTE = "singleton";
-
 	public static final String LAZY_INIT_ATTRIBUTE = "lazy-init";
-
 	public static final String AUTOWIRE_ATTRIBUTE = "autowire";
-
 	public static final String AUTOWIRE_CANDIDATE_ATTRIBUTE = "autowire-candidate";
-
 	public static final String PRIMARY_ATTRIBUTE = "primary";
-
 	public static final String DEPENDS_ON_ATTRIBUTE = "depends-on";
-
 	public static final String INIT_METHOD_ATTRIBUTE = "init-method";
-
 	public static final String DESTROY_METHOD_ATTRIBUTE = "destroy-method";
-
 	public static final String FACTORY_METHOD_ATTRIBUTE = "factory-method";
-
 	public static final String FACTORY_BEAN_ATTRIBUTE = "factory-bean";
-
 	public static final String CONSTRUCTOR_ARG_ELEMENT = "constructor-arg";
-
 	public static final String INDEX_ATTRIBUTE = "index";
-
 	public static final String TYPE_ATTRIBUTE = "type";
-
 	public static final String VALUE_TYPE_ATTRIBUTE = "value-type";
-
 	public static final String KEY_TYPE_ATTRIBUTE = "key-type";
-
 	public static final String PROPERTY_ELEMENT = "property";
-
 	public static final String REF_ATTRIBUTE = "ref";
-
 	public static final String VALUE_ATTRIBUTE = "value";
-
 	public static final String LOOKUP_METHOD_ELEMENT = "lookup-method";
-
 	public static final String REPLACED_METHOD_ELEMENT = "replaced-method";
-
 	public static final String REPLACER_ATTRIBUTE = "replacer";
-
 	public static final String ARG_TYPE_ELEMENT = "arg-type";
-
 	public static final String ARG_TYPE_MATCH_ATTRIBUTE = "match";
-
 	public static final String REF_ELEMENT = "ref";
-
 	public static final String IDREF_ELEMENT = "idref";
-
 	public static final String BEAN_REF_ATTRIBUTE = "bean";
-
 	public static final String PARENT_REF_ATTRIBUTE = "parent";
-
 	public static final String VALUE_ELEMENT = "value";
-
 	public static final String NULL_ELEMENT = "null";
-
 	public static final String ARRAY_ELEMENT = "array";
-
 	public static final String LIST_ELEMENT = "list";
-
 	public static final String SET_ELEMENT = "set";
-
 	public static final String MAP_ELEMENT = "map";
-
 	public static final String ENTRY_ELEMENT = "entry";
-
 	public static final String KEY_ELEMENT = "key";
-
 	public static final String KEY_ATTRIBUTE = "key";
-
 	public static final String KEY_REF_ATTRIBUTE = "key-ref";
-
 	public static final String VALUE_REF_ATTRIBUTE = "value-ref";
-
 	public static final String PROPS_ELEMENT = "props";
-
 	public static final String PROP_ELEMENT = "prop";
-
 	public static final String MERGE_ATTRIBUTE = "merge";
-
 	public static final String QUALIFIER_ELEMENT = "qualifier";
-
 	public static final String QUALIFIER_ATTRIBUTE_ELEMENT = "attribute";
-
 	public static final String DEFAULT_LAZY_INIT_ATTRIBUTE = "default-lazy-init";
-
 	public static final String DEFAULT_MERGE_ATTRIBUTE = "default-merge";
-
 	public static final String DEFAULT_AUTOWIRE_ATTRIBUTE = "default-autowire";
-
 	public static final String DEFAULT_AUTOWIRE_CANDIDATES_ATTRIBUTE = "default-autowire-candidates";
-
 	public static final String DEFAULT_INIT_METHOD_ATTRIBUTE = "default-init-method";
-
 	public static final String DEFAULT_DESTROY_METHOD_ATTRIBUTE = "default-destroy-method";
-
-
+	private static final String SINGLETON_ATTRIBUTE = "singleton";
 	protected final Log logger = LogFactory.getLog(getClass());
 
 	private final XmlReaderContext readerContext;
@@ -425,8 +341,8 @@ public class BeanDefinitionParserDelegate {
 		if (!StringUtils.hasText(beanName) && !aliases.isEmpty()) {
 			beanName = aliases.remove(0);
 			if (logger.isDebugEnabled()) {
-				logger.debug("No XML 'id' specified - using '" + beanName +
-						"' as bean name and " + aliases + " as aliases");
+				logger.debug(
+						"No XML 'id' specified - using '" + beanName + "' as bean name and " + aliases + " as aliases");
 			}
 		}
 
@@ -434,15 +350,15 @@ public class BeanDefinitionParserDelegate {
 			checkNameUniqueness(beanName, aliases, ele);
 		}
 
+		// 此处构建了BeanDefinnition
 		AbstractBeanDefinition beanDefinition = parseBeanDefinitionElement(ele, beanName, containingBean);
 		if (beanDefinition != null) {
 			if (!StringUtils.hasText(beanName)) {
 				try {
 					if (containingBean != null) {
-						beanName = BeanDefinitionReaderUtils.generateBeanName(
-								beanDefinition, this.readerContext.getRegistry(), true);
-					}
-					else {
+						beanName = BeanDefinitionReaderUtils
+								.generateBeanName(beanDefinition, this.readerContext.getRegistry(), true);
+					} else {
 						beanName = this.readerContext.generateBeanName(beanDefinition);
 						// Register an alias for the plain bean class name, if still possible,
 						// if the generator returned the class name plus a suffix.
@@ -1379,6 +1295,7 @@ public class BeanDefinitionParserDelegate {
 		NamedNodeMap attributes = ele.getAttributes();
 		for (int i = 0; i < attributes.getLength(); i++) {
 			Node node = attributes.item(i);
+			// 此处初始化了BeanDefinition
 			finalDefinition = decorateIfRequired(node, finalDefinition, containingBd);
 		}
 

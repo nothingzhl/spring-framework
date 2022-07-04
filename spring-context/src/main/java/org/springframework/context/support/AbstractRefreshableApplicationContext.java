@@ -16,14 +16,14 @@
 
 package org.springframework.context.support;
 
-import java.io.IOException;
-
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.ApplicationContextException;
 import org.springframework.lang.Nullable;
+
+import java.io.IOException;
 
 /**
  * Base class for {@link org.springframework.context.ApplicationContext}
@@ -64,18 +64,15 @@ import org.springframework.lang.Nullable;
  */
 public abstract class AbstractRefreshableApplicationContext extends AbstractApplicationContext {
 
+	/** Synchronization monitor for the internal BeanFactory */
+	private final Object beanFactoryMonitor = new Object();
 	@Nullable
 	private Boolean allowBeanDefinitionOverriding;
-
 	@Nullable
 	private Boolean allowCircularReferences;
-
 	/** Bean factory for this context */
 	@Nullable
 	private DefaultListableBeanFactory beanFactory;
-
-	/** Synchronization monitor for the internal BeanFactory */
-	private final Object beanFactoryMonitor = new Object();
 
 
 	/**
@@ -130,6 +127,7 @@ public abstract class AbstractRefreshableApplicationContext extends AbstractAppl
 			DefaultListableBeanFactory beanFactory = createBeanFactory();
 			beanFactory.setSerializationId(getId());
 			customizeBeanFactory(beanFactory);
+			// 此处加载bean
 			loadBeanDefinitions(beanFactory);
 			synchronized (this.beanFactoryMonitor) {
 				this.beanFactory = beanFactory;

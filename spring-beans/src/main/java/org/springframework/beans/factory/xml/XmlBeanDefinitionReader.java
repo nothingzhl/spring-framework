@@ -16,27 +16,9 @@
 
 package org.springframework.beans.factory.xml;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.HashSet;
-import java.util.Set;
-import javax.xml.parsers.ParserConfigurationException;
-
-import org.w3c.dom.Document;
-import org.xml.sax.EntityResolver;
-import org.xml.sax.ErrorHandler;
-import org.xml.sax.InputSource;
-import org.xml.sax.SAXException;
-import org.xml.sax.SAXParseException;
-
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.BeanDefinitionStoreException;
-import org.springframework.beans.factory.parsing.EmptyReaderEventListener;
-import org.springframework.beans.factory.parsing.FailFastProblemReporter;
-import org.springframework.beans.factory.parsing.NullSourceExtractor;
-import org.springframework.beans.factory.parsing.ProblemReporter;
-import org.springframework.beans.factory.parsing.ReaderEventListener;
-import org.springframework.beans.factory.parsing.SourceExtractor;
+import org.springframework.beans.factory.parsing.*;
 import org.springframework.beans.factory.support.AbstractBeanDefinitionReader;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.core.Constants;
@@ -49,6 +31,14 @@ import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.xml.SimpleSaxErrorHandler;
 import org.springframework.util.xml.XmlValidationModeDetector;
+import org.w3c.dom.Document;
+import org.xml.sax.*;
+
+import javax.xml.parsers.ParserConfigurationException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Bean definition reader for XML bean definitions.
@@ -97,37 +87,26 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 	 */
 	public static final int VALIDATION_XSD = XmlValidationModeDetector.VALIDATION_XSD;
 
-
-	/** Constants instance for this class */
+	/**
+	 * Constants instance for this class
+	 */
 	private static final Constants constants = new Constants(XmlBeanDefinitionReader.class);
-
-	private int validationMode = VALIDATION_AUTO;
-
-	private boolean namespaceAware = false;
-
-	private Class<? extends BeanDefinitionDocumentReader> documentReaderClass =
-			DefaultBeanDefinitionDocumentReader.class;
-
-	private ProblemReporter problemReporter = new FailFastProblemReporter();
-
-	private ReaderEventListener eventListener = new EmptyReaderEventListener();
-
-	private SourceExtractor sourceExtractor = new NullSourceExtractor();
-
-	@Nullable
-	private NamespaceHandlerResolver namespaceHandlerResolver;
-
-	private DocumentLoader documentLoader = new DefaultDocumentLoader();
-
-	@Nullable
-	private EntityResolver entityResolver;
-
-	private ErrorHandler errorHandler = new SimpleSaxErrorHandler(logger);
-
 	private final XmlValidationModeDetector validationModeDetector = new XmlValidationModeDetector();
-
 	private final ThreadLocal<Set<EncodedResource>> resourcesCurrentlyBeingLoaded =
 			new NamedThreadLocal<>("XML bean definition resources currently being loaded");
+	private int validationMode = VALIDATION_AUTO;
+	private boolean namespaceAware = false;
+	private Class<? extends BeanDefinitionDocumentReader> documentReaderClass =
+			DefaultBeanDefinitionDocumentReader.class;
+	private ProblemReporter problemReporter = new FailFastProblemReporter();
+	private ReaderEventListener eventListener = new EmptyReaderEventListener();
+	private SourceExtractor sourceExtractor = new NullSourceExtractor();
+	@Nullable
+	private NamespaceHandlerResolver namespaceHandlerResolver;
+	private DocumentLoader documentLoader = new DefaultDocumentLoader();
+	@Nullable
+	private EntityResolver entityResolver;
+	private ErrorHandler errorHandler = new SimpleSaxErrorHandler(logger);
 
 
 	/**
@@ -154,10 +133,18 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 
 	/**
 	 * Set the validation mode to use by name. Defaults to {@link #VALIDATION_AUTO}.
+	 *
 	 * @see #setValidationMode
 	 */
 	public void setValidationModeName(String validationModeName) {
 		setValidationMode(constants.asNumber(validationModeName).intValue());
+	}
+
+	/**
+	 * Return the validation mode to use.
+	 */
+	public int getValidationMode() {
+		return this.validationMode;
 	}
 
 	/**
@@ -171,10 +158,10 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 	}
 
 	/**
-	 * Return the validation mode to use.
+	 * Return whether or not the XML parser should be XML namespace aware.
 	 */
-	public int getValidationMode() {
-		return this.validationMode;
+	public boolean isNamespaceAware() {
+		return this.namespaceAware;
 	}
 
 	/**
@@ -186,13 +173,6 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 	 */
 	public void setNamespaceAware(boolean namespaceAware) {
 		this.namespaceAware = namespaceAware;
-	}
-
-	/**
-	 * Return whether or not the XML parser should be XML namespace aware.
-	 */
-	public boolean isNamespaceAware() {
-		return this.namespaceAware;
 	}
 
 	/**
@@ -226,30 +206,12 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 	}
 
 	/**
-	 * Specify the {@link NamespaceHandlerResolver} to use.
-	 * <p>If none is specified, a default instance will be created through
-	 * {@link #createDefaultNamespaceHandlerResolver()}.
-	 */
-	public void setNamespaceHandlerResolver(@Nullable NamespaceHandlerResolver namespaceHandlerResolver) {
-		this.namespaceHandlerResolver = namespaceHandlerResolver;
-	}
-
-	/**
 	 * Specify the {@link DocumentLoader} to use.
 	 * <p>The default implementation is {@link DefaultDocumentLoader}
 	 * which loads {@link Document} instances using JAXP.
 	 */
 	public void setDocumentLoader(@Nullable DocumentLoader documentLoader) {
 		this.documentLoader = (documentLoader != null ? documentLoader : new DefaultDocumentLoader());
-	}
-
-	/**
-	 * Set a SAX entity resolver to be used for parsing.
-	 * <p>By default, {@link ResourceEntityResolver} will be used. Can be overridden
-	 * for custom entity resolution, for example relative to some specific base path.
-	 */
-	public void setEntityResolver(@Nullable EntityResolver entityResolver) {
-		this.entityResolver = entityResolver;
 	}
 
 	/**
@@ -262,12 +224,20 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 			ResourceLoader resourceLoader = getResourceLoader();
 			if (resourceLoader != null) {
 				this.entityResolver = new ResourceEntityResolver(resourceLoader);
-			}
-			else {
+			} else {
 				this.entityResolver = new DelegatingEntityResolver(getBeanClassLoader());
 			}
 		}
 		return this.entityResolver;
+	}
+
+	/**
+	 * Set a SAX entity resolver to be used for parsing.
+	 * <p>By default, {@link ResourceEntityResolver} will be used. Can be overridden
+	 * for custom entity resolution, for example relative to some specific base path.
+	 */
+	public void setEntityResolver(@Nullable EntityResolver entityResolver) {
+		this.entityResolver = entityResolver;
 	}
 
 	/**
@@ -291,7 +261,6 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 	public void setDocumentReaderClass(Class<? extends BeanDefinitionDocumentReader> documentReaderClass) {
 		this.documentReaderClass = documentReaderClass;
 	}
-
 
 	/**
 	 * Load bean definitions from the specified XML file.
@@ -375,7 +344,6 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 		return doLoadBeanDefinitions(inputSource, new DescriptiveResource(resourceDescription));
 	}
 
-
 	/**
 	 * Actually load bean definitions from the specified XML file.
 	 * @param inputSource the SAX InputSource to read from
@@ -389,6 +357,7 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 			throws BeanDefinitionStoreException {
 		try {
 			Document doc = doLoadDocument(inputSource, resource);
+			// 开始解析和注册BeanDefinition
 			return registerBeanDefinitions(doc, resource);
 		}
 		catch (BeanDefinitionStoreException ex) {
@@ -505,6 +474,7 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 	public int registerBeanDefinitions(Document doc, Resource resource) throws BeanDefinitionStoreException {
 		BeanDefinitionDocumentReader documentReader = createBeanDefinitionDocumentReader();
 		int countBefore = getRegistry().getBeanDefinitionCount();
+		// 此处解析beanDefinition 和创建上下文
 		documentReader.registerBeanDefinitions(doc, createReaderContext(resource));
 		return getRegistry().getBeanDefinitionCount() - countBefore;
 	}
@@ -523,12 +493,13 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 	 * Create the {@link XmlReaderContext} to pass over to the document reader.
 	 */
 	public XmlReaderContext createReaderContext(Resource resource) {
-		return new XmlReaderContext(resource, this.problemReporter, this.eventListener,
-				this.sourceExtractor, this, getNamespaceHandlerResolver());
+		return new XmlReaderContext(resource, this.problemReporter, this.eventListener, this.sourceExtractor, this,
+				getNamespaceHandlerResolver());
 	}
 
 	/**
 	 * Lazily create a default NamespaceHandlerResolver, if not set before.
+	 *
 	 * @see #createDefaultNamespaceHandlerResolver()
 	 */
 	public NamespaceHandlerResolver getNamespaceHandlerResolver() {
@@ -539,8 +510,18 @@ public class XmlBeanDefinitionReader extends AbstractBeanDefinitionReader {
 	}
 
 	/**
+	 * Specify the {@link NamespaceHandlerResolver} to use.
+	 * <p>If none is specified, a default instance will be created through
+	 * {@link #createDefaultNamespaceHandlerResolver()}.
+	 */
+	public void setNamespaceHandlerResolver(@Nullable NamespaceHandlerResolver namespaceHandlerResolver) {
+		this.namespaceHandlerResolver = namespaceHandlerResolver;
+	}
+
+	/**
 	 * Create the default implementation of {@link NamespaceHandlerResolver} used if none is specified.
 	 * <p>The default implementation returns an instance of {@link DefaultNamespaceHandlerResolver}.
+	 *
 	 * @see DefaultNamespaceHandlerResolver#DefaultNamespaceHandlerResolver(ClassLoader)
 	 */
 	protected NamespaceHandlerResolver createDefaultNamespaceHandlerResolver() {

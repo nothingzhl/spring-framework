@@ -16,36 +16,16 @@
 
 package org.springframework.beans.factory.groovy;
 
-import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
-import groovy.lang.Binding;
-import groovy.lang.Closure;
-import groovy.lang.GString;
-import groovy.lang.GroovyObject;
-import groovy.lang.GroovyObjectSupport;
-import groovy.lang.GroovyShell;
-import groovy.lang.GroovySystem;
-import groovy.lang.MetaClass;
+import groovy.lang.*;
 import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.codehaus.groovy.runtime.InvokerHelper;
-
 import org.springframework.beans.MutablePropertyValues;
 import org.springframework.beans.factory.BeanDefinitionStoreException;
 import org.springframework.beans.factory.config.RuntimeBeanReference;
 import org.springframework.beans.factory.parsing.BeanDefinitionParsingException;
 import org.springframework.beans.factory.parsing.Location;
 import org.springframework.beans.factory.parsing.Problem;
-import org.springframework.beans.factory.support.AbstractBeanDefinition;
-import org.springframework.beans.factory.support.AbstractBeanDefinitionReader;
-import org.springframework.beans.factory.support.BeanDefinitionRegistry;
-import org.springframework.beans.factory.support.GenericBeanDefinition;
-import org.springframework.beans.factory.support.ManagedList;
-import org.springframework.beans.factory.support.ManagedMap;
+import org.springframework.beans.factory.support.*;
 import org.springframework.beans.factory.xml.BeanDefinitionParserDelegate;
 import org.springframework.beans.factory.xml.NamespaceHandler;
 import org.springframework.beans.factory.xml.XmlBeanDefinitionReader;
@@ -55,6 +35,9 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.support.EncodedResource;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.StringUtils;
+
+import java.io.IOException;
+import java.util.*;
 
 /**
  * A Groovy-based reader for Spring bean definitions: like a Groovy builder,
@@ -181,13 +164,19 @@ public class GroovyBeanDefinitionReader extends AbstractBeanDefinitionReader imp
 		this.groovyDslXmlBeanDefinitionReader = xmlBeanDefinitionReader;
 	}
 
+	public MetaClass getMetaClass() {
+		return this.metaClass;
+	}
 
 	public void setMetaClass(MetaClass metaClass) {
 		this.metaClass = metaClass;
 	}
 
-	public MetaClass getMetaClass() {
-		return this.metaClass;
+	/**
+	 * Return a specified binding for Groovy variables, if any.
+	 */
+	public Binding getBinding() {
+		return this.binding;
 	}
 
 	/**
@@ -198,13 +187,6 @@ public class GroovyBeanDefinitionReader extends AbstractBeanDefinitionReader imp
 		this.binding = binding;
 	}
 
-	/**
-	 * Return a specified binding for Groovy variables, if any.
-	 */
-	public Binding getBinding() {
-		return this.binding;
-	}
-
 
 	// TRADITIONAL BEAN DEFINITION READER METHODS
 
@@ -212,10 +194,12 @@ public class GroovyBeanDefinitionReader extends AbstractBeanDefinitionReader imp
 	 * Load bean definitions from the specified Groovy script or XML file.
 	 * <p>Note that {@code ".xml"} files will be parsed as XML content; all other kinds
 	 * of resources will be parsed as Groovy scripts.
+	 *
 	 * @param resource the resource descriptor for the Groovy script or XML file
 	 * @return the number of bean definitions found
 	 * @throws BeanDefinitionStoreException in case of loading or parsing errors
 	 */
+	@Override
 	public int loadBeanDefinitions(Resource resource) throws BeanDefinitionStoreException {
 		return loadBeanDefinitions(new EncodedResource(resource));
 	}
@@ -744,6 +728,10 @@ public class GroovyBeanDefinitionReader extends AbstractBeanDefinitionReader imp
 			return this.metaClass;
 		}
 
+		public void setMetaClass(MetaClass metaClass) {
+			this.metaClass = metaClass;
+		}
+
 		public Object getProperty(String property) {
 			if (property.equals("beanName")) {
 				return getBeanName();
@@ -762,10 +750,6 @@ public class GroovyBeanDefinitionReader extends AbstractBeanDefinitionReader imp
 
 		public Object invokeMethod(String name, Object args) {
 			return this.metaClass.invokeMethod(this, name, args);
-		}
-
-		public void setMetaClass(MetaClass metaClass) {
-			this.metaClass = metaClass;
 		}
 
 		public void setProperty(String property, Object newValue) {

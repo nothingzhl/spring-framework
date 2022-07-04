@@ -16,12 +16,8 @@
 
 package org.springframework.beans.factory.support;
 
-import java.io.IOException;
-import java.util.Set;
-
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-
 import org.springframework.beans.factory.BeanDefinitionStoreException;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.EnvironmentCapable;
@@ -32,6 +28,9 @@ import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.core.io.support.ResourcePatternResolver;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
+
+import java.io.IOException;
+import java.util.Set;
 
 /**
  * Abstract base class for bean definition readers which implement
@@ -111,6 +110,12 @@ public abstract class AbstractBeanDefinitionReader implements EnvironmentCapable
 		return this.registry;
 	}
 
+	@Override
+	@Nullable
+	public ResourceLoader getResourceLoader() {
+		return this.resourceLoader;
+	}
+
 	/**
 	 * Set the ResourceLoader to use for resource locations.
 	 * If specifying a ResourcePatternResolver, the bean definition reader
@@ -128,8 +133,8 @@ public abstract class AbstractBeanDefinitionReader implements EnvironmentCapable
 
 	@Override
 	@Nullable
-	public ResourceLoader getResourceLoader() {
-		return this.resourceLoader;
+	public ClassLoader getBeanClassLoader() {
+		return this.beanClassLoader;
 	}
 
 	/**
@@ -144,9 +149,8 @@ public abstract class AbstractBeanDefinitionReader implements EnvironmentCapable
 	}
 
 	@Override
-	@Nullable
-	public ClassLoader getBeanClassLoader() {
-		return this.beanClassLoader;
+	public Environment getEnvironment() {
+		return this.environment;
 	}
 
 	/**
@@ -160,8 +164,8 @@ public abstract class AbstractBeanDefinitionReader implements EnvironmentCapable
 	}
 
 	@Override
-	public Environment getEnvironment() {
-		return this.environment;
+	public BeanNameGenerator getBeanNameGenerator() {
+		return this.beanNameGenerator;
 	}
 
 	/**
@@ -172,12 +176,6 @@ public abstract class AbstractBeanDefinitionReader implements EnvironmentCapable
 	public void setBeanNameGenerator(@Nullable BeanNameGenerator beanNameGenerator) {
 		this.beanNameGenerator = (beanNameGenerator != null ? beanNameGenerator : new DefaultBeanNameGenerator());
 	}
-
-	@Override
-	public BeanNameGenerator getBeanNameGenerator() {
-		return this.beanNameGenerator;
-	}
-
 
 	@Override
 	public int loadBeanDefinitions(Resource... resources) throws BeanDefinitionStoreException {
@@ -219,7 +217,8 @@ public abstract class AbstractBeanDefinitionReader implements EnvironmentCapable
 		if (resourceLoader instanceof ResourcePatternResolver) {
 			// Resource pattern matching available.
 			try {
-				Resource[] resources = ((ResourcePatternResolver) resourceLoader).getResources(location);
+				Resource[] resources = ((ResourcePatternResolver)resourceLoader).getResources(location);
+				// 解析并加载
 				int loadCount = loadBeanDefinitions(resources);
 				if (actualResources != null) {
 					for (Resource resource : resources) {
