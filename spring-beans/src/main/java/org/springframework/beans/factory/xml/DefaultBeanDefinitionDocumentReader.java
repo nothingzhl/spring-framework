@@ -93,6 +93,7 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 	public void registerBeanDefinitions(Document doc, XmlReaderContext readerContext) {
 		this.readerContext = readerContext;
 		logger.debug("Loading bean definitions");
+		//注册beanDefinition，将document中root元素传入
 		Element root = doc.getDocumentElement();
 		// 开始解析和注册BeanDefinition
 		doRegisterBeanDefinitions(root);
@@ -127,6 +128,7 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 		// then ultimately reset this.delegate back to its original (parent) reference.
 		// this behavior emulates a stack of delegates without actually necessitating one.
 		BeanDefinitionParserDelegate parent = this.delegate;
+		// 创建代理类
 		this.delegate = createDelegate(getReaderContext(), root, parent);
 
 		if (this.delegate.isDefaultNamespace(root)) {
@@ -157,6 +159,7 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 	protected BeanDefinitionParserDelegate createDelegate(
 			XmlReaderContext readerContext, Element root, @Nullable BeanDefinitionParserDelegate parentDelegate) {
 
+		// 创建 beanDefinitions解析代理类
 		BeanDefinitionParserDelegate delegate = new BeanDefinitionParserDelegate(readerContext);
 		delegate.initDefaults(root, parentDelegate);
 		return delegate;
@@ -169,14 +172,22 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 	 */
 	protected void parseBeanDefinitions(Element root, BeanDefinitionParserDelegate delegate) {
 		if (delegate.isDefaultNamespace(root)) {
+			// 获取子Node的list
 			NodeList nl = root.getChildNodes();
 			for (int i = 0; i < nl.getLength(); i++) {
 				Node node = nl.item(i);
 				if (node instanceof Element) {
 					Element ele = (Element)node;
 					if (delegate.isDefaultNamespace(ele)) {
+						//默认标签解析，bean，import等
 						parseDefaultElement(ele, delegate);
 					} else {
+						//自定义标签解析, context等
+						// a、根据当前解析标签的头信息找到对应的namespaceUri
+						// b、加载spring所以jar中的spring.handlers文件。并建立映射关系
+						// c、根据namespaceUri从映射关系中找到对应的实现了NamespaceHandler接口的类
+						// d、调用类的init方法，init方法是注册了各种自定义标签的解析类
+						// e、根据namespaceUri找到对应的解析类，然后调用paser方法完成标签解析
 						delegate.parseCustomElement(ele);
 					}
 				}
@@ -306,12 +317,14 @@ public class DefaultBeanDefinitionDocumentReader implements BeanDefinitionDocume
 	 * and registering it with the registry.
 	 */
 	protected void processBeanDefinition(Element ele, BeanDefinitionParserDelegate delegate) {
+		//解析document，封装成BeanDefinition
 		BeanDefinitionHolder bdHolder = delegate.parseBeanDefinitionElement(ele);
 		if (bdHolder != null) {
 			// 装饰器模式
 			bdHolder = delegate.decorateBeanDefinitionIfRequired(ele, bdHolder);
 			try {
 				// Register the final decorated instance. 此处注册Bean
+				//完成document到BeanDefinition对象转换后，对BeanDefinition对象进行缓存注册
 				BeanDefinitionReaderUtils.registerBeanDefinition(bdHolder, getReaderContext().getRegistry());
 			} catch (BeanDefinitionStoreException ex) {
 				getReaderContext()

@@ -328,6 +328,7 @@ public class BeanDefinitionParserDelegate {
 	 */
 	@Nullable
 	public BeanDefinitionHolder parseBeanDefinitionElement(Element ele, @Nullable BeanDefinition containingBean) {
+		// bean元素的属性 id、name（别名，可以配置多个 以,;分隔）
 		String id = ele.getAttribute(ID_ATTRIBUTE);
 		String nameAttr = ele.getAttribute(NAME_ATTRIBUTE);
 
@@ -337,6 +338,7 @@ public class BeanDefinitionParserDelegate {
 			aliases.addAll(Arrays.asList(nameArr));
 		}
 
+		// id就是bean的名称，如果id没有配置，但是name配置了，就使用name的值作为bean的名称
 		String beanName = id;
 		if (!StringUtils.hasText(beanName) && !aliases.isEmpty()) {
 			beanName = aliases.remove(0);
@@ -346,11 +348,17 @@ public class BeanDefinitionParserDelegate {
 			}
 		}
 
+		//检查beanName是否重复
 		if (containingBean == null) {
 			checkNameUniqueness(beanName, aliases, ele);
 		}
 
 		// 此处构建了BeanDefinnition
+		// 解析并创建beanDefinition对象
+		// 最后解析完成后，把名称、类型以及值的信息封装到对象上，
+		// 然后设置到beanDefinition对象上。
+		// bean元素解析完成，将属性设置到beanDefinition对象上，
+		// 然后返回到上一步，封装到了BeanDefinitionHolder对象上维护
 		AbstractBeanDefinition beanDefinition = parseBeanDefinitionElement(ele, beanName, containingBean);
 		if (beanDefinition != null) {
 			if (!StringUtils.hasText(beanName)) {
@@ -418,27 +426,43 @@ public class BeanDefinitionParserDelegate {
 
 		this.parseState.push(new BeanEntry(beanName));
 
+		//class属性
 		String className = null;
 		if (ele.hasAttribute(CLASS_ATTRIBUTE)) {
 			className = ele.getAttribute(CLASS_ATTRIBUTE).trim();
 		}
+		// parent 属性
 		String parent = null;
 		if (ele.hasAttribute(PARENT_ATTRIBUTE)) {
 			parent = ele.getAttribute(PARENT_ATTRIBUTE);
 		}
 
 		try {
+			// 1.创建对应的BeanDefinition
 			AbstractBeanDefinition bd = createBeanDefinition(className, parent);
 
+			// 2.解析bean标签的属性，并把解析出来的属性设置到BeanDefinition对象中(scope等)（**********）
 			parseBeanDefinitionAttributes(ele, beanName, containingBean, bd);
+
+			// 设置对一个的bean的描述
 			bd.setDescription(DomUtils.getChildElementValueByTagName(ele, DESCRIPTION_ELEMENT));
 
+			//3.解析bean中的meta标签（参见spring-xml）
 			parseMetaElements(ele, bd);
+
+			//4.解析bean中的lookup-method标签（代理，作用：多态方式）
 			parseLookupOverrideSubElements(ele, bd.getMethodOverrides());
+
+			//5.解析bean中的replaced-method标签
 			parseReplacedMethodSubElements(ele, bd.getMethodOverrides());
 
+			//6.解析bean中的constructor-arg标签
 			parseConstructorArgElements(ele, bd);
+
+			//7.解析bean中的property标签
 			parsePropertyElements(ele, bd);
+
+			//8.解析qualifier
 			parseQualifierElements(ele, bd);
 
 			bd.setResource(this.readerContext.getResource());
@@ -1292,10 +1316,10 @@ public class BeanDefinitionParserDelegate {
 		BeanDefinitionHolder finalDefinition = definitionHolder;
 
 		// Decorate based on custom attributes first.
+		//根据bean标签属性装饰BeanDefinitionHolder，比如<bean class="xx" p:username="jack"/>
 		NamedNodeMap attributes = ele.getAttributes();
 		for (int i = 0; i < attributes.getLength(); i++) {
 			Node node = attributes.item(i);
-			// 此处初始化了BeanDefinition
 			finalDefinition = decorateIfRequired(node, finalDefinition, containingBd);
 		}
 
@@ -1314,7 +1338,10 @@ public class BeanDefinitionParserDelegate {
 			Node node, BeanDefinitionHolder originalDef, @Nullable BeanDefinition containingBd) {
 
 		String namespaceUri = getNamespaceURI(node);
+
+		// 解析不是默认uri空间的文本
 		if (namespaceUri != null && !isDefaultNamespace(namespaceUri)) {
+			//这里有SPI服务发现的思想，根据配置文件获取namespaceUri对应的处理类
 			NamespaceHandler handler = this.readerContext.getNamespaceHandlerResolver().resolve(namespaceUri);
 			if (handler != null) {
 				BeanDefinitionHolder decorated =
@@ -1322,11 +1349,9 @@ public class BeanDefinitionParserDelegate {
 				if (decorated != null) {
 					return decorated;
 				}
-			}
-			else if (namespaceUri.startsWith("http://www.springframework.org/")) {
+			} else if (namespaceUri.startsWith("http://www.springframework.org/")) {
 				error("Unable to locate Spring NamespaceHandler for XML schema namespace [" + namespaceUri + "]", node);
-			}
-			else {
+			} else {
 				// A custom namespace, not to be handled by Spring - maybe "xml:...".
 				if (logger.isDebugEnabled()) {
 					logger.debug("No Spring NamespaceHandler found for XML schema namespace [" + namespaceUri + "]");

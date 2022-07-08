@@ -1,6 +1,7 @@
 package org.zhl;
 
 import org.springframework.context.support.ClassPathXmlApplicationContext;
+import org.zhl.bean.ObjectLookup;
 import org.zhl.bean.Person;
 
 /**
@@ -14,5 +15,11 @@ public class XMLContextRunner {
 				new ClassPathXmlApplicationContext("classpath:Spring-Learning.xml");
 		final Person person = classPathXmlApplicationContext.getBean("person", Person.class);
 		person.sayHi();
+		person.action();
+		System.out.println(person.getSkill());
+
+		final ObjectLookup bean = classPathXmlApplicationContext.getBean("objectLookUp", ObjectLookup.class);
+		System.out.println(bean.getObject());
+
 	}
 }

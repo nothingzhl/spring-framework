@@ -474,6 +474,19 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 			prepareRefresh();
 
 			// Tell the subclass to refresh the internal bean factory.
+			/*
+			 * 1、创建BeanFactory对象
+			 * 2、xml解析
+			 *    传统标签解析：bean、import等
+			 *    自定义标签解析：例如：<context:component-scan base-package="com.zhl"/>
+			 *    自定义标签解析流程：
+			 *     a、根据当前解析标签的头信息找到对应的namespaceUri
+			 *     b、加载spring所以jar中的spring.handlers文件。并建立映射关系
+			 *     c、根据namespaceUri从映射关系中找到对应的实现了NamespaceHandler接口的类
+			 *     d、调用类的init方法，init方法是注册了各种自定义标签的解析类
+			 *     e、根据namespaceUri找到对应的解析类，然后调用paser方法完成标签解析
+			 * 3、把解析出来的xml标签信息封装成BeanDefinition对象
+			 */
 			ConfigurableListableBeanFactory beanFactory = obtainFreshBeanFactory();
 
 			// Prepare the bean factory for use in this context.
@@ -481,27 +494,38 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 
 			try {
 				// Allows post-processing of the bean factory in context subclasses.
+				//钩子方法，由子类实现
 				postProcessBeanFactory(beanFactory);
 
 				// Invoke factory processors registered as beans in the context.
+				// 注册beanFactoryPostProcessor对象
 				invokeBeanFactoryPostProcessors(beanFactory);
 
 				// Register bean processors that intercept bean creation.
+				// 注册beanPostProcessor实例，在bean创建的时候实现拦截
 				registerBeanPostProcessors(beanFactory);
 
 				// Initialize message source for this context.
+				// 国际化
 				initMessageSource();
 
 				// Initialize event multicaster for this context.
+				// 初始化时间管理类
 				initApplicationEventMulticaster();
 
 				// Initialize other special beans in specific context subclasses.
+				//此方法着重理解模板设计模式，因为在springboot中，这个方法是用来做内嵌tomcat启动的
 				onRefresh();
 
 				// Check for listener beans and register them.
+				// 往时间管理类中注册事件类
 				registerListeners();
 
 				// Instantiate all remaining (non-lazy-init) singletons.
+				/*
+				 * 在之前已经实例化了BeanFactoryPostProcessor以及beanPostProcessor
+				 * 下面开始实例化剩下的所有非懒加载的单例对象
+				 */
 				finishBeanFactoryInitialization(beanFactory);
 
 				// Last step: publish corresponding event.
@@ -574,6 +598,8 @@ public abstract class AbstractApplicationContext extends DefaultResourceLoader
 	 */
 	protected ConfigurableListableBeanFactory obtainFreshBeanFactory() {
 		// 刷新beanFactory（这个时候会创建beanFactory）
+		//核心方法，必须读，重要程度：5
+		//此方法是钩子方法，在子类中实现
 		refreshBeanFactory();
 		ConfigurableListableBeanFactory beanFactory = getBeanFactory();
 		if (logger.isDebugEnabled()) {

@@ -15,4 +15,5 @@ public class BeanConfig {
 	public Person person() {
 		return new Person();
 	}
+
 }

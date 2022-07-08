@@ -1,10 +1,19 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <beans xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	   xmlns="http://www.springframework.org/schema/beans"
 	   xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
 
-	<bean name="person" class="org.zhl.bean.Person">
-
+	<bean name="god" class="org.zhl.bean.God">
+		<property name="skill" value="t"></property>
 	</bean>
+
+	<bean name="person" class="org.zhl.bean.Person" parent="god">
+		<replaced-method name="action" replacer="god"></replaced-method>
+	</bean>
+
+	<bean name="objectLookUp" class="org.zhl.bean.ObjectLookup">
+		<lookup-method name="getObject" bean="person"></lookup-method>
+	</bean>
+
 
 </beans>
