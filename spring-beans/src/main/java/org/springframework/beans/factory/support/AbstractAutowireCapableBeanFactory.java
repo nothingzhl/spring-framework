@@ -16,6 +16,14 @@
 
 package org.springframework.beans.factory.support;
 
+import org.apache.commons.logging.Log;
+import org.springframework.beans.*;
+import org.springframework.beans.factory.*;
+import org.springframework.beans.factory.config.*;
+import org.springframework.core.*;
+import org.springframework.lang.Nullable;
+import org.springframework.util.*;
+
 import java.beans.PropertyDescriptor;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
@@ -25,62 +33,10 @@ import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
-
-import org.apache.commons.logging.Log;
-
-import org.springframework.beans.BeanUtils;
-import org.springframework.beans.BeanWrapper;
-import org.springframework.beans.BeanWrapperImpl;
-import org.springframework.beans.BeansException;
-import org.springframework.beans.MutablePropertyValues;
-import org.springframework.beans.PropertyAccessorUtils;
-import org.springframework.beans.PropertyValue;
-import org.springframework.beans.PropertyValues;
-import org.springframework.beans.TypeConverter;
-import org.springframework.beans.factory.Aware;
-import org.springframework.beans.factory.BeanClassLoaderAware;
-import org.springframework.beans.factory.BeanCreationException;
-import org.springframework.beans.factory.BeanCurrentlyInCreationException;
-import org.springframework.beans.factory.BeanDefinitionStoreException;
-import org.springframework.beans.factory.BeanFactory;
-import org.springframework.beans.factory.BeanFactoryAware;
-import org.springframework.beans.factory.BeanNameAware;
-import org.springframework.beans.factory.FactoryBean;
-import org.springframework.beans.factory.InitializingBean;
-import org.springframework.beans.factory.UnsatisfiedDependencyException;
-import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
-import org.springframework.beans.factory.config.BeanDefinition;
-import org.springframework.beans.factory.config.BeanPostProcessor;
-import org.springframework.beans.factory.config.ConfigurableBeanFactory;
-import org.springframework.beans.factory.config.ConstructorArgumentValues;
-import org.springframework.beans.factory.config.DependencyDescriptor;
-import org.springframework.beans.factory.config.InstantiationAwareBeanPostProcessor;
-import org.springframework.beans.factory.config.SmartInstantiationAwareBeanPostProcessor;
-import org.springframework.beans.factory.config.TypedStringValue;
-import org.springframework.core.DefaultParameterNameDiscoverer;
-import org.springframework.core.GenericTypeResolver;
-import org.springframework.core.MethodParameter;
-import org.springframework.core.NamedThreadLocal;
-import org.springframework.core.ParameterNameDiscoverer;
-import org.springframework.core.PriorityOrdered;
-import org.springframework.core.ResolvableType;
-import org.springframework.lang.Nullable;
-import org.springframework.util.Assert;
-import org.springframework.util.ClassUtils;
-import org.springframework.util.ObjectUtils;
-import org.springframework.util.ReflectionUtils;
-import org.springframework.util.StringUtils;
 
 /**
  * Abstract bean factory superclass that implements default bean creation,
@@ -120,47 +76,48 @@ import org.springframework.util.StringUtils;
 public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFactory
 		implements AutowireCapableBeanFactory {
 
-	/** Strategy for creating bean instances */
-	private InstantiationStrategy instantiationStrategy = new CglibSubclassingInstantiationStrategy();
-
-	/** Resolver strategy for method parameter names */
-	@Nullable
-	private ParameterNameDiscoverer parameterNameDiscoverer = new DefaultParameterNameDiscoverer();
-
-	/** Whether to automatically try to resolve circular references between beans */
-	private boolean allowCircularReferences = true;
-
-	/**
-	 * Whether to resort to injecting a raw bean instance in case of circular reference,
-	 * even if the injected bean eventually got wrapped.
-	 */
-	private boolean allowRawInjectionDespiteWrapping = false;
-
 	/**
 	 * Dependency types to ignore on dependency check and autowire, as Set of
 	 * Class objects: for example, String. Default is none.
 	 */
 	private final Set<Class<?>> ignoredDependencyTypes = new HashSet<>();
-
 	/**
 	 * Dependency interfaces to ignore on dependency check and autowire, as Set of
 	 * Class objects. By default, only the BeanFactory interface is ignored.
 	 */
 	private final Set<Class<?>> ignoredDependencyInterfaces = new HashSet<>();
-
 	/**
 	 * The name of the currently created bean, for implicit dependency registration
 	 * on getBean etc invocations triggered from a user-specified Supplier callback.
 	 */
 	private final NamedThreadLocal<String> currentlyCreatedBean = new NamedThreadLocal<>("Currently created bean");
-
-	/** Cache of unfinished FactoryBean instances: FactoryBean name --> BeanWrapper */
+	/**
+	 * Cache of unfinished FactoryBean instances: FactoryBean name --> BeanWrapper
+	 */
 	private final ConcurrentMap<String, BeanWrapper> factoryBeanInstanceCache = new ConcurrentHashMap<>(16);
-
-	/** Cache of filtered PropertyDescriptors: bean Class -> PropertyDescriptor array */
+	/**
+	 * Cache of filtered PropertyDescriptors: bean Class -> PropertyDescriptor array
+	 */
 	private final ConcurrentMap<Class<?>, PropertyDescriptor[]> filteredPropertyDescriptorsCache =
 			new ConcurrentHashMap<>(256);
-
+	/**
+	 * Strategy for creating bean instances
+	 */
+	private InstantiationStrategy instantiationStrategy = new CglibSubclassingInstantiationStrategy();
+	/**
+	 * Resolver strategy for method parameter names
+	 */
+	@Nullable
+	private ParameterNameDiscoverer parameterNameDiscoverer = new DefaultParameterNameDiscoverer();
+	/**
+	 * Whether to automatically try to resolve circular references between beans
+	 */
+	private boolean allowCircularReferences = true;
+	/**
+	 * Whether to resort to injecting a raw bean instance in case of circular reference,
+	 * even if the injected bean eventually got wrapped.
+	 */
+	private boolean allowRawInjectionDespiteWrapping = false;
 
 	/**
 	 * Create a new AbstractAutowireCapableBeanFactory.
@@ -174,21 +131,12 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 
 	/**
 	 * Create a new AbstractAutowireCapableBeanFactory with the given parent.
+	 *
 	 * @param parentBeanFactory parent bean factory, or {@code null} if none
 	 */
 	public AbstractAutowireCapableBeanFactory(@Nullable BeanFactory parentBeanFactory) {
 		this();
 		setParentBeanFactory(parentBeanFactory);
-	}
-
-
-	/**
-	 * Set the instantiation strategy to use for creating bean instances.
-	 * Default is CglibSubclassingInstantiationStrategy.
-	 * @see CglibSubclassingInstantiationStrategy
-	 */
-	public void setInstantiationStrategy(InstantiationStrategy instantiationStrategy) {
-		this.instantiationStrategy = instantiationStrategy;
 	}
 
 	/**
@@ -199,12 +147,13 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 	}
 
 	/**
-	 * Set the ParameterNameDiscoverer to use for resolving method parameter
-	 * names if needed (e.g. for constructor names).
-	 * <p>Default is a {@link DefaultParameterNameDiscoverer}.
+	 * Set the instantiation strategy to use for creating bean instances.
+	 * Default is CglibSubclassingInstantiationStrategy.
+	 *
+	 * @see CglibSubclassingInstantiationStrategy
 	 */
-	public void setParameterNameDiscoverer(@Nullable ParameterNameDiscoverer parameterNameDiscoverer) {
-		this.parameterNameDiscoverer = parameterNameDiscoverer;
+	public void setInstantiationStrategy(InstantiationStrategy instantiationStrategy) {
+		this.instantiationStrategy = instantiationStrategy;
 	}
 
 	/**
@@ -214,6 +163,15 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 	@Nullable
 	protected ParameterNameDiscoverer getParameterNameDiscoverer() {
 		return this.parameterNameDiscoverer;
+	}
+
+	/**
+	 * Set the ParameterNameDiscoverer to use for resolving method parameter
+	 * names if needed (e.g. for constructor names).
+	 * <p>Default is a {@link DefaultParameterNameDiscoverer}.
+	 */
+	public void setParameterNameDiscoverer(@Nullable ParameterNameDiscoverer parameterNameDiscoverer) {
+		this.parameterNameDiscoverer = parameterNameDiscoverer;
 	}
 
 	/**
@@ -451,6 +409,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 	 * Central method of this class: creates a bean instance,
 	 * populates the bean instance, applies post-processors, etc.
 	 * @see #doCreateBean
+	 * 创建bean的方法
 	 */
 	@Override
 	protected Object createBean(String beanName, RootBeanDefinition mbd, @Nullable Object[] args)
@@ -473,14 +432,14 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 		// Prepare method overrides.
 		try {
 			mbdToUse.prepareMethodOverrides();
-		}
-		catch (BeanDefinitionValidationException ex) {
-			throw new BeanDefinitionStoreException(mbdToUse.getResourceDescription(),
-					beanName, "Validation of method overrides failed", ex);
+		} catch (BeanDefinitionValidationException ex) {
+			throw new BeanDefinitionStoreException(mbdToUse.getResourceDescription(), beanName,
+					"Validation of method overrides failed", ex);
 		}
 
 		try {
 			// Give BeanPostProcessors a chance to return a proxy instead of the target bean instance.
+			// aop 的实现？
 			Object bean = resolveBeforeInstantiation(beanName, mbdToUse);
 			if (bean != null) {
 				return bean;
@@ -492,6 +451,7 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 		}
 
 		try {
+			// bean 的实现2
 			Object beanInstance = doCreateBean(beanName, mbdToUse, args);
 			if (logger.isDebugEnabled()) {
 				logger.debug("Finished creating instance of bean '" + beanName + "'");
@@ -556,24 +516,24 @@ public abstract class AbstractAutowireCapableBeanFactory extends AbstractBeanFac
 
 		// Eagerly cache singletons to be able to resolve circular references
 		// even when triggered by lifecycle interfaces like BeanFactoryAware.
-		boolean earlySingletonExposure = (mbd.isSingleton() && this.allowCircularReferences &&
-				isSingletonCurrentlyInCreation(beanName));
+		boolean earlySingletonExposure =
+				(mbd.isSingleton() && this.allowCircularReferences && isSingletonCurrentlyInCreation(beanName));
 		if (earlySingletonExposure) {
 			if (logger.isDebugEnabled()) {
-				logger.debug("Eagerly caching bean '" + beanName +
-						"' to allow for resolving potential circular references");
+				logger.debug(
+						"Eagerly caching bean '" + beanName + "' to allow for resolving potential circular references");
 			}
 			addSingletonFactory(beanName, () -> getEarlyBeanReference(beanName, mbd, bean));
 		}
 
 		// Initialize the bean instance.
 		Object exposedObject = bean;
+		// todo 不知道这个地方在干哈
 		try {
 			populateBean(beanName, mbd, instanceWrapper);
 			exposedObject = initializeBean(beanName, exposedObject, mbd);
-		}
-		catch (Throwable ex) {
-			if (ex instanceof BeanCreationException && beanName.equals(((BeanCreationException) ex).getBeanName())) {
+		} catch (Throwable ex) {
+			if (ex instanceof BeanCreationException && beanName.equals(((BeanCreationException)ex).getBeanName())) {
 				throw (BeanCreationException) ex;
 			}
 			else {

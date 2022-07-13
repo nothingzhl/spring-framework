@@ -16,26 +16,15 @@
 
 package org.springframework.beans.factory.support;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-
-import org.springframework.beans.factory.BeanCreationException;
-import org.springframework.beans.factory.BeanCreationNotAllowedException;
-import org.springframework.beans.factory.BeanCurrentlyInCreationException;
-import org.springframework.beans.factory.DisposableBean;
-import org.springframework.beans.factory.ObjectFactory;
+import org.springframework.beans.factory.*;
 import org.springframework.beans.factory.config.SingletonBeanRegistry;
 import org.springframework.core.SimpleAliasRegistry;
 import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Generic registry for shared bean instances, implementing the
@@ -87,28 +76,32 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 			Collections.newSetFromMap(new ConcurrentHashMap<>(16));
 
 	/** Names of beans currently excluded from in creation checks */
-	private final Set<String> inCreationCheckExclusions =
-			Collections.newSetFromMap(new ConcurrentHashMap<>(16));
-
-	/** List of suppressed Exceptions, available for associating related causes */
+	private final Set<String> inCreationCheckExclusions = Collections.newSetFromMap(new ConcurrentHashMap<>(16));
+	/**
+	 * Disposable bean instances: bean name --> disposable instance
+	 */
+	private final Map<String, Object> disposableBeans = new LinkedHashMap<>();
+	/**
+	 * Map between containing bean names: bean name --> Set of bean names that the bean contains
+	 */
+	private final Map<String, Set<String>> containedBeanMap = new ConcurrentHashMap<>(16);
+	/**
+	 * Map between dependent bean names: bean name --> Set of dependent bean names
+	 */
+	private final Map<String, Set<String>> dependentBeanMap = new ConcurrentHashMap<>(64);
+	/**
+	 * Map between depending bean names: bean name --> Set of bean names for the bean's dependencies
+	 */
+	private final Map<String, Set<String>> dependenciesForBeanMap = new ConcurrentHashMap<>(64);
+	/**
+	 * List of suppressed Exceptions, available for associating related causes
+	 */
 	@Nullable
 	private Set<Exception> suppressedExceptions;
-
-	/** Flag that indicates whether we're currently within destroySingletons */
+	/**
+	 * Flag that indicates whether we're currently within destroySingletons
+	 */
 	private boolean singletonsCurrentlyInDestruction = false;
-
-	/** Disposable bean instances: bean name --> disposable instance */
-	private final Map<String, Object> disposableBeans = new LinkedHashMap<>();
-
-	/** Map between containing bean names: bean name --> Set of bean names that the bean contains */
-	private final Map<String, Set<String>> containedBeanMap = new ConcurrentHashMap<>(16);
-
-	/** Map between dependent bean names: bean name --> Set of dependent bean names */
-	private final Map<String, Set<String>> dependentBeanMap = new ConcurrentHashMap<>(64);
-
-	/** Map between depending bean names: bean name --> Set of bean names for the bean's dependencies */
-	private final Map<String, Set<String>> dependenciesForBeanMap = new ConcurrentHashMap<>(64);
-
 
 	@Override
 	public void registerSingleton(String beanName, Object singletonObject) throws IllegalStateException {
@@ -117,8 +110,9 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 		synchronized (this.singletonObjects) {
 			Object oldObject = this.singletonObjects.get(beanName);
 			if (oldObject != null) {
-				throw new IllegalStateException("Could not register object [" + singletonObject +
-						"] under bean name '" + beanName + "': there is already object [" + oldObject + "] bound");
+				throw new IllegalStateException(
+						"Could not register object [" + singletonObject + "] under bean name '" + beanName
+								+ "': there is already object [" + oldObject + "] bound");
 			}
 			addSingleton(beanName, singletonObject);
 		}
@@ -206,12 +200,13 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 			if (singletonObject == null) {
 				if (this.singletonsCurrentlyInDestruction) {
 					throw new BeanCreationNotAllowedException(beanName,
-							"Singleton bean creation not allowed while singletons of this factory are in destruction " +
-							"(Do not request a bean from a BeanFactory in a destroy method implementation!)");
+							"Singleton bean creation not allowed while singletons of this factory are in destruction "
+									+ "(Do not request a bean from a BeanFactory in a destroy method implementation!)");
 				}
 				if (logger.isDebugEnabled()) {
 					logger.debug("Creating shared instance of singleton bean '" + beanName + "'");
 				}
+				// 创建前的钩子方法
 				beforeSingletonCreation(beanName);
 				boolean newSingleton = false;
 				boolean recordSuppressedExceptions = (this.suppressedExceptions == null);
@@ -219,6 +214,7 @@ public class DefaultSingletonBeanRegistry extends SimpleAliasRegistry implements
 					this.suppressedExceptions = new LinkedHashSet<>();
 				}
 				try {
+					// 调用创建bean的function的方法
 					singletonObject = singletonFactory.getObject();
 					newSingleton = true;
 				}
