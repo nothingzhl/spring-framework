@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package org.springframework.web.bind;
 
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 
 /**
  * {@link ServletRequestBindingException} subclass that indicates that a path
@@ -57,7 +58,7 @@ public class MissingPathVariableException extends MissingRequestValueException {
 	public MissingPathVariableException(
 			String variableName, MethodParameter parameter, boolean missingAfterConversion) {
 
-		super("", missingAfterConversion);
+		super("", missingAfterConversion, null, new Object[] {variableName});
 		this.variableName = variableName;
 		this.parameter = parameter;
 		getBody().setDetail("Required path variable '" + this.variableName + "' is not present.");
@@ -85,10 +86,9 @@ public class MissingPathVariableException extends MissingRequestValueException {
 		return this.parameter;
 	}
 
-
 	@Override
-	public int getRawStatusCode() {
-		return HttpStatus.INTERNAL_SERVER_ERROR.value();
+	public HttpStatusCode getStatusCode() {
+		return (isMissingAfterConversion() ? HttpStatus.BAD_REQUEST : HttpStatus.INTERNAL_SERVER_ERROR);
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,7 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.aop.scope.ScopedProxyFactoryBean;
 import org.springframework.asm.Opcodes;
 import org.springframework.asm.Type;
+import org.springframework.beans.factory.BeanDefinitionStoreException;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.BeanFactoryAware;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
@@ -37,6 +38,7 @@ import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.beans.factory.support.SimpleInstantiationStrategy;
 import org.springframework.cglib.core.ClassGenerator;
 import org.springframework.cglib.core.ClassLoaderAwareGeneratorStrategy;
+import org.springframework.cglib.core.CodeGenerationException;
 import org.springframework.cglib.core.SpringNamingPolicy;
 import org.springframework.cglib.proxy.Callback;
 import org.springframework.cglib.proxy.CallbackFilter;
@@ -47,6 +49,7 @@ import org.springframework.cglib.proxy.MethodProxy;
 import org.springframework.cglib.proxy.NoOp;
 import org.springframework.cglib.transform.ClassEmitterTransformer;
 import org.springframework.cglib.transform.TransformingClassGenerator;
+import org.springframework.core.SmartClassLoader;
 import org.springframework.lang.Nullable;
 import org.springframework.objenesis.ObjenesisException;
 import org.springframework.objenesis.SpringObjenesis;
@@ -73,7 +76,7 @@ import org.springframework.util.ReflectionUtils;
 class ConfigurationClassEnhancer {
 
 	// The callbacks to use. Note that these callbacks must be stateless.
-	private static final Callback[] CALLBACKS = new Callback[] {
+	static final Callback[] CALLBACKS = new Callback[] {
 			new BeanMethodInterceptor(),
 			new BeanFactoryAwareMethodInterceptor(),
 			NoOp.INSTANCE
@@ -106,12 +109,19 @@ class ConfigurationClassEnhancer {
 			}
 			return configClass;
 		}
-		Class<?> enhancedClass = createClass(newEnhancer(configClass, classLoader));
-		if (logger.isTraceEnabled()) {
-			logger.trace(String.format("Successfully enhanced %s; enhanced class name is: %s",
-					configClass.getName(), enhancedClass.getName()));
+		try {
+			Class<?> enhancedClass = createClass(newEnhancer(configClass, classLoader));
+			if (logger.isTraceEnabled()) {
+				logger.trace(String.format("Successfully enhanced %s; enhanced class name is: %s",
+						configClass.getName(), enhancedClass.getName()));
+			}
+			return enhancedClass;
 		}
-		return enhancedClass;
+		catch (CodeGenerationException ex) {
+			throw new BeanDefinitionStoreException("Could not enhance configuration class [" + configClass.getName() +
+					"]. Consider declaring @Configuration(proxyBeanMethods=false) without inter-bean references " +
+					"between @Bean methods on the configuration class, avoiding the need for CGLIB enhancement.", ex);
+		}
 	}
 
 	/**
@@ -123,10 +133,19 @@ class ConfigurationClassEnhancer {
 		enhancer.setInterfaces(new Class<?>[] {EnhancedConfiguration.class});
 		enhancer.setUseFactory(false);
 		enhancer.setNamingPolicy(SpringNamingPolicy.INSTANCE);
+		enhancer.setAttemptLoad(!isClassReloadable(configSuperClass, classLoader));
 		enhancer.setStrategy(new BeanFactoryAwareGeneratorStrategy(classLoader));
 		enhancer.setCallbackFilter(CALLBACK_FILTER);
 		enhancer.setCallbackTypes(CALLBACK_FILTER.getCallbackTypes());
 		return enhancer;
+	}
+
+	/**
+	 * Checks whether the given configuration class is reloadable.
+	 */
+	private boolean isClassReloadable(Class<?> configSuperClass, @Nullable ClassLoader classLoader) {
+		return (classLoader instanceof SmartClassLoader smartClassLoader &&
+				smartClassLoader.isClassReloadable(configSuperClass));
 	}
 
 	/**
@@ -189,7 +208,7 @@ class ConfigurationClassEnhancer {
 		public int accept(Method method) {
 			for (int i = 0; i < this.callbacks.length; i++) {
 				Callback callback = this.callbacks[i];
-				if (!(callback instanceof ConditionalCallback) || ((ConditionalCallback) callback).isMatch(method)) {
+				if (!(callback instanceof ConditionalCallback conditional) || conditional.isMatch(method)) {
 					return i;
 				}
 			}
@@ -207,8 +226,7 @@ class ConfigurationClassEnhancer {
 	 * Also exposes the application ClassLoader as thread context ClassLoader for the time of
 	 * class generation (in order for ASM to pick it up when doing common superclass resolution).
 	 */
-	private static class BeanFactoryAwareGeneratorStrategy extends
-			ClassLoaderAwareGeneratorStrategy {
+	private static class BeanFactoryAwareGeneratorStrategy extends ClassLoaderAwareGeneratorStrategy {
 
 		public BeanFactoryAwareGeneratorStrategy(@Nullable ClassLoader classLoader) {
 			super(classLoader);
@@ -225,7 +243,6 @@ class ConfigurationClassEnhancer {
 			};
 			return new TransformingClassGenerator(cg, transformer);
 		}
-
 	}
 
 
@@ -334,6 +351,7 @@ class ConfigurationClassEnhancer {
 			return resolveBeanReference(beanMethod, beanMethodArgs, beanFactory, beanName);
 		}
 
+		@Nullable
 		private Object resolveBeanReference(Method beanMethod, Object[] beanMethodArgs,
 				ConfigurableBeanFactory beanFactory, String beanName) {
 
@@ -508,6 +526,7 @@ class ConfigurationClassEnhancer {
 			Enhancer enhancer = new Enhancer();
 			enhancer.setSuperclass(factoryBean.getClass());
 			enhancer.setNamingPolicy(SpringNamingPolicy.INSTANCE);
+			enhancer.setAttemptLoad(true);
 			enhancer.setCallbackType(MethodInterceptor.class);
 
 			// Ideally create enhanced FactoryBean proxy without constructor side effects,
@@ -539,7 +558,7 @@ class ConfigurationClassEnhancer {
 				if (method.getName().equals("getObject") && args.length == 0) {
 					return beanFactory.getBean(beanName);
 				}
-				return proxy.invoke(factoryBean, args);
+				return method.invoke(factoryBean, args);
 			});
 
 			return fbProxy;

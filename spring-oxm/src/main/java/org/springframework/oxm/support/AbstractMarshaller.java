@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -83,9 +83,10 @@ public abstract class AbstractMarshaller implements Marshaller, Unmarshaller {
 	private boolean processExternalEntities = false;
 
 	@Nullable
-	private DocumentBuilderFactory documentBuilderFactory;
+	private volatile DocumentBuilderFactory documentBuilderFactory;
 
-	private final Object documentBuilderFactoryMonitor = new Object();
+	@Nullable
+	private volatile SAXParserFactory saxParserFactory;
 
 
 	/**
@@ -94,6 +95,8 @@ public abstract class AbstractMarshaller implements Marshaller, Unmarshaller {
 	 */
 	public void setSupportDtd(boolean supportDtd) {
 		this.supportDtd = supportDtd;
+		this.documentBuilderFactory = null;
+		this.saxParserFactory = null;
 	}
 
 	/**
@@ -118,6 +121,8 @@ public abstract class AbstractMarshaller implements Marshaller, Unmarshaller {
 		if (processExternalEntities) {
 			this.supportDtd = true;
 		}
+		this.documentBuilderFactory = null;
+		this.saxParserFactory = null;
 	}
 
 	/**
@@ -137,14 +142,13 @@ public abstract class AbstractMarshaller implements Marshaller, Unmarshaller {
 	 */
 	protected Document buildDocument() {
 		try {
-			DocumentBuilder documentBuilder;
-			synchronized (this.documentBuilderFactoryMonitor) {
-				if (this.documentBuilderFactory == null) {
-					this.documentBuilderFactory = createDocumentBuilderFactory();
-				}
-				documentBuilder = createDocumentBuilder(this.documentBuilderFactory);
+			DocumentBuilderFactory builderFactory = this.documentBuilderFactory;
+			if (builderFactory == null) {
+				builderFactory = createDocumentBuilderFactory();
+				this.documentBuilderFactory = builderFactory;
 			}
-			return documentBuilder.newDocument();
+			DocumentBuilder builder = createDocumentBuilder(builderFactory);
+			return builder.newDocument();
 		}
 		catch (ParserConfigurationException ex) {
 			throw new UnmarshallingFailureException("Could not create document placeholder: " + ex.getMessage(), ex);
@@ -179,11 +183,11 @@ public abstract class AbstractMarshaller implements Marshaller, Unmarshaller {
 	protected DocumentBuilder createDocumentBuilder(DocumentBuilderFactory factory)
 			throws ParserConfigurationException {
 
-		DocumentBuilder documentBuilder = factory.newDocumentBuilder();
+		DocumentBuilder builder = factory.newDocumentBuilder();
 		if (!isProcessExternalEntities()) {
-			documentBuilder.setEntityResolver(NO_OP_ENTITY_RESOLVER);
+			builder.setEntityResolver(NO_OP_ENTITY_RESOLVER);
 		}
-		return documentBuilder;
+		return builder;
 	}
 
 	/**
@@ -193,11 +197,17 @@ public abstract class AbstractMarshaller implements Marshaller, Unmarshaller {
 	 * @throws ParserConfigurationException if thrown by JAXP methods
 	 */
 	protected XMLReader createXmlReader() throws SAXException, ParserConfigurationException {
-		SAXParserFactory saxParserFactory = SAXParserFactory.newInstance();
-		saxParserFactory.setNamespaceAware(true);
-		saxParserFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", !isSupportDtd());
-		saxParserFactory.setFeature("http://xml.org/sax/features/external-general-entities", isProcessExternalEntities());
-		SAXParser saxParser = saxParserFactory.newSAXParser();
+		SAXParserFactory parserFactory = this.saxParserFactory;
+		if (parserFactory == null) {
+			parserFactory = SAXParserFactory.newInstance();
+			parserFactory.setNamespaceAware(true);
+			parserFactory.setFeature(
+					"http://apache.org/xml/features/disallow-doctype-decl", !isSupportDtd());
+			parserFactory.setFeature(
+					"http://xml.org/sax/features/external-general-entities", isProcessExternalEntities());
+			this.saxParserFactory = parserFactory;
+		}
+		SAXParser saxParser = parserFactory.newSAXParser();
 		XMLReader xmlReader = saxParser.getXMLReader();
 		if (!isProcessExternalEntities()) {
 			xmlReader.setEntityResolver(NO_OP_ENTITY_RESOLVER);
@@ -234,17 +244,17 @@ public abstract class AbstractMarshaller implements Marshaller, Unmarshaller {
 	 */
 	@Override
 	public final void marshal(Object graph, Result result) throws IOException, XmlMappingException {
-		if (result instanceof DOMResult) {
-			marshalDomResult(graph, (DOMResult) result);
+		if (result instanceof DOMResult domResult) {
+			marshalDomResult(graph, domResult);
 		}
 		else if (StaxUtils.isStaxResult(result)) {
 			marshalStaxResult(graph, result);
 		}
-		else if (result instanceof SAXResult) {
-			marshalSaxResult(graph, (SAXResult) result);
+		else if (result instanceof SAXResult saxResult) {
+			marshalSaxResult(graph, saxResult);
 		}
-		else if (result instanceof StreamResult) {
-			marshalStreamResult(graph, (StreamResult) result);
+		else if (result instanceof StreamResult streamResult) {
+			marshalStreamResult(graph, streamResult);
 		}
 		else {
 			throw new IllegalArgumentException("Unknown Result type: " + result.getClass());
@@ -353,17 +363,17 @@ public abstract class AbstractMarshaller implements Marshaller, Unmarshaller {
 	 */
 	@Override
 	public final Object unmarshal(Source source) throws IOException, XmlMappingException {
-		if (source instanceof DOMSource) {
-			return unmarshalDomSource((DOMSource) source);
+		if (source instanceof DOMSource domSource) {
+			return unmarshalDomSource(domSource);
 		}
 		else if (StaxUtils.isStaxSource(source)) {
 			return unmarshalStaxSource(source);
 		}
-		else if (source instanceof SAXSource) {
-			return unmarshalSaxSource((SAXSource) source);
+		else if (source instanceof SAXSource saxSource) {
+			return unmarshalSaxSource(saxSource);
 		}
-		else if (source instanceof StreamSource) {
-			return unmarshalStreamSource((StreamSource) source);
+		else if (source instanceof StreamSource streamSource) {
+			return unmarshalStreamSource(streamSource);
 		}
 		else {
 			throw new IllegalArgumentException("Unknown Source type: " + source.getClass());
@@ -493,7 +503,7 @@ public abstract class AbstractMarshaller implements Marshaller, Unmarshaller {
 
 	/**
 	 * Abstract template method for marshalling the given object graph to a DOM {@code Node}.
-	 * <p>In practice, node is be a {@code Document} node, a {@code DocumentFragment} node,
+	 * <p>In practice, {@code node} is a {@code Document} node, a {@code DocumentFragment} node,
 	 * or a {@code Element} node. In other words, a node that accepts children.
 	 * @param graph the root of the object graph to marshal
 	 * @param node the DOM node that will contain the result tree

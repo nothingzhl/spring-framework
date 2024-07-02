@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -160,8 +160,8 @@ public class ControllerAdviceBean implements Ordered {
 		if (this.order == null) {
 			String beanName = null;
 			Object resolvedBean = null;
-			if (this.beanFactory != null && this.beanOrName instanceof String) {
-				beanName = (String) this.beanOrName;
+			if (this.beanFactory != null && this.beanOrName instanceof String stringBeanName) {
+				beanName = stringBeanName;
 				String targetBeanName = ScopedProxyUtils.getTargetBeanName(beanName);
 				boolean isScopedProxy = this.beanFactory.containsBean(targetBeanName);
 				// Avoid eager @ControllerAdvice bean resolution for scoped proxies,
@@ -220,9 +220,8 @@ public class ControllerAdviceBean implements Ordered {
 	/**
 	 * Get the bean instance for this {@code ControllerAdviceBean}, if necessary
 	 * resolving the bean name through the {@link BeanFactory}.
-	 * <p>As of Spring Framework 5.2, once the bean instance has been resolved it
-	 * will be cached if it is a singleton, thereby avoiding repeated lookups in
-	 * the {@code BeanFactory}.
+	 * <p>Once the bean instance has been resolved it will be cached if it is a
+	 * singleton, thereby avoiding repeated lookups in the {@code BeanFactory}.
 	 */
 	public Object resolveBean() {
 		if (this.resolvedBean == null) {
@@ -257,13 +256,8 @@ public class ControllerAdviceBean implements Ordered {
 
 	@Override
 	public boolean equals(@Nullable Object other) {
-		if (this == other) {
-			return true;
-		}
-		if (!(other instanceof ControllerAdviceBean otherAdvice)) {
-			return false;
-		}
-		return (this.beanOrName.equals(otherAdvice.beanOrName) && this.beanFactory == otherAdvice.beanFactory);
+		return (this == other || (other instanceof ControllerAdviceBean that &&
+				this.beanOrName.equals(that.beanOrName) && this.beanFactory == that.beanFactory));
 	}
 
 	@Override
@@ -281,8 +275,8 @@ public class ControllerAdviceBean implements Ordered {
 	 * Find beans annotated with {@link ControllerAdvice @ControllerAdvice} in the
 	 * given {@link ApplicationContext} and wrap them as {@code ControllerAdviceBean}
 	 * instances.
-	 * <p>As of Spring Framework 5.2, the {@code ControllerAdviceBean} instances
-	 * in the returned list are sorted using {@link OrderComparator#sort(List)}.
+	 * <p>Note that the {@code ControllerAdviceBean} instances in the returned list
+	 * are sorted using {@link OrderComparator#sort(List)}.
 	 * @see #getOrder()
 	 * @see OrderComparator
 	 * @see Ordered

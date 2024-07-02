@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2019 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,7 +19,6 @@ package org.springframework.web.servlet.function;
 import java.io.IOException;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -45,29 +44,30 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * @author Arjen Poutsma
  */
-public class DefaultEntityResponseBuilderTests {
+class DefaultEntityResponseBuilderTests {
 
-	static final ServerResponse.Context EMPTY_CONTEXT = () -> Collections.emptyList();
+	static final ServerResponse.Context EMPTY_CONTEXT = Collections::emptyList;
 
 	@Test
-	public void fromObject() {
+	void fromObject() {
 		String body = "foo";
 		EntityResponse<String> response = EntityResponse.fromObject(body).build();
 		assertThat(response.entity()).isSameAs(body);
 	}
 
 	@Test
-	public void fromObjectTypeReference() {
+	void fromObjectTypeReference() {
 		String body = "foo";
 		EntityResponse<String> response = EntityResponse.fromObject(body,
-				new ParameterizedTypeReference<String>() {})
+				new ParameterizedTypeReference<>() {})
 				.build();
 
 		assertThat(response.entity()).isSameAs(body);
 	}
 
 	@Test
-	public void status() {
+	@SuppressWarnings("deprecation")
+	void status() {
 		String body = "foo";
 		EntityResponse<String> result =
 				EntityResponse.fromObject(body).status(HttpStatus.CREATED).build();
@@ -77,7 +77,7 @@ public class DefaultEntityResponseBuilderTests {
 	}
 
 	@Test
-	public void allow() {
+	void allow() {
 		String body = "foo";
 		EntityResponse<String> result =
 				EntityResponse.fromObject(body).allow(HttpMethod.GET).build();
@@ -86,14 +86,14 @@ public class DefaultEntityResponseBuilderTests {
 	}
 
 	@Test
-	public void contentLength() {
+	void contentLength() {
 		String body = "foo";
 		EntityResponse<String> result = EntityResponse.fromObject(body).contentLength(42).build();
 		assertThat(result.headers().getContentLength()).isEqualTo(42);
 	}
 
 	@Test
-	public void contentType() {
+	void contentType() {
 		String body = "foo";
 		EntityResponse<String>
 				result =
@@ -103,7 +103,7 @@ public class DefaultEntityResponseBuilderTests {
 	}
 
 	@Test
-	public void etag() {
+	void etag() {
 		String body = "foo";
 		EntityResponse<String> result = EntityResponse.fromObject(body).eTag("foo").build();
 
@@ -111,7 +111,7 @@ public class DefaultEntityResponseBuilderTests {
 	}
 
 	@Test
-	public void lastModified() {
+	void lastModified() {
 		ZonedDateTime now = ZonedDateTime.now();
 		String body = "foo";
 		EntityResponse<String> result = EntityResponse.fromObject(body).lastModified(now).build();
@@ -120,7 +120,7 @@ public class DefaultEntityResponseBuilderTests {
 	}
 
 	@Test
-	public void cacheControlTag() {
+	void cacheControlTag() {
 		String body = "foo";
 		EntityResponse<String> result =
 				EntityResponse.fromObject(body).cacheControl(CacheControl.noCache()).build();
@@ -128,7 +128,7 @@ public class DefaultEntityResponseBuilderTests {
 	}
 
 	@Test
-	public void varyBy() {
+	void varyBy() {
 		String body = "foo";
 		EntityResponse<String> result = EntityResponse.fromObject(body).varyBy("foo").build();
 		List<String> expected = Collections.singletonList("foo");
@@ -136,14 +136,14 @@ public class DefaultEntityResponseBuilderTests {
 	}
 
 	@Test
-	public void header() {
+	void header() {
 		String body = "foo";
 		EntityResponse<String> result = EntityResponse.fromObject(body).header("foo", "bar").build();
 		assertThat(result.headers().getFirst("foo")).isEqualTo("bar");
 	}
 
 	@Test
-	public void headers() {
+	void headers() {
 		String body = "foo";
 		HttpHeaders headers = new HttpHeaders();
 		headers.set("foo", "bar");
@@ -154,16 +154,16 @@ public class DefaultEntityResponseBuilderTests {
 	}
 
 	@Test
-	public void cookie() {
+	void cookie() {
 		Cookie cookie = new Cookie("name", "value");
 		EntityResponse<String> result =
 				EntityResponse.fromObject("foo").cookie(cookie)
 						.build();
-		assertThat(result.cookies().get("name").contains(cookie)).isTrue();
+		assertThat(result.cookies().get("name")).contains(cookie);
 	}
 
 	@Test
-	public void cookies() {
+	void cookies() {
 		MultiValueMap<String, Cookie> newCookies = new LinkedMultiValueMap<>();
 		newCookies.add("name", new Cookie("name", "value"));
 		EntityResponse<String> result =
@@ -173,7 +173,7 @@ public class DefaultEntityResponseBuilderTests {
 	}
 
 	@Test
-	public void notModifiedEtag() throws Exception {
+	void notModifiedEtag() throws Exception {
 		String etag = "\"foo\"";
 		EntityResponse<String> entityResponse = EntityResponse.fromObject("bar")
 				.eTag(etag)
@@ -192,9 +192,9 @@ public class DefaultEntityResponseBuilderTests {
 
 
 	@Test
-	public void notModifiedLastModified() throws ServletException, IOException {
+	void notModifiedLastModified() throws ServletException, IOException {
 		ZonedDateTime now = ZonedDateTime.now();
-		ZonedDateTime oneMinuteBeforeNow = now.minus(1, ChronoUnit.MINUTES);
+		ZonedDateTime oneMinuteBeforeNow = now.minusMinutes(1);
 
 		EntityResponse<String> entityResponse = EntityResponse.fromObject("bar")
 				.lastModified(oneMinuteBeforeNow)

@@ -15,3 +15,15 @@ changelog:
       sort: "title"
       labels:
         - "type: dependency-upgrade"
+  contributors:
+    exclude:
+      names:
+        - "bclozel"
+        - "github-actions[bot]"
+        - "jhoeller"
+        - "poutsma"
+        - "rstoyanchev"
+        - "sbrannen"
+        - "sdeleuze"
+        - "simonbasle"
+        - "snicoll"

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2021 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,8 @@ package org.springframework.web.reactive.function.client;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -30,6 +32,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.client.reactive.ClientHttpResponse;
 import org.springframework.lang.Nullable;
@@ -56,12 +59,6 @@ final class DefaultClientResponseBuilder implements ClientResponse.Builder {
 		}
 
 		@Override
-		@Deprecated
-		public String getMethodValue() {
-			return "UNKNOWN";
-		}
-
-		@Override
 		public URI getURI() {
 			return this.empty;
 		}
@@ -70,12 +67,17 @@ final class DefaultClientResponseBuilder implements ClientResponse.Builder {
 		public HttpHeaders getHeaders() {
 			return HttpHeaders.EMPTY;
 		}
+
+		@Override
+		public Map<String, Object> getAttributes() {
+			return Collections.emptyMap();
+		}
 	};
 
 
 	private final ExchangeStrategies strategies;
 
-	private int statusCode = 200;
+	private HttpStatusCode statusCode = HttpStatus.OK;
 
 	@Nullable
 	private HttpHeaders headers;
@@ -102,7 +104,7 @@ final class DefaultClientResponseBuilder implements ClientResponse.Builder {
 	DefaultClientResponseBuilder(ClientResponse other, boolean mutate) {
 		Assert.notNull(other, "ClientResponse must not be null");
 		this.strategies = other.strategies();
-		this.statusCode = other.rawStatusCode();
+		this.statusCode = other.statusCode();
 		if (mutate) {
 			this.body = other.bodyToFlux(DataBuffer.class);
 		}
@@ -117,15 +119,15 @@ final class DefaultClientResponseBuilder implements ClientResponse.Builder {
 
 
 	@Override
-	public DefaultClientResponseBuilder statusCode(HttpStatus statusCode) {
-		return rawStatusCode(statusCode.value());
+	public DefaultClientResponseBuilder statusCode(HttpStatusCode statusCode) {
+		Assert.notNull(statusCode, "HttpStatusCode must not be null");
+		this.statusCode = statusCode;
+		return this;
 	}
 
 	@Override
 	public DefaultClientResponseBuilder rawStatusCode(int statusCode) {
-		Assert.isTrue(statusCode >= 100 && statusCode < 600, "StatusCode must be between 1xx and 5xx");
-		this.statusCode = statusCode;
-		return this;
+		return statusCode(HttpStatusCode.valueOf(statusCode));
 	}
 
 	@Override
@@ -142,10 +144,10 @@ final class DefaultClientResponseBuilder implements ClientResponse.Builder {
 		return this;
 	}
 
-	@SuppressWarnings("ConstantConditions")
+	@SuppressWarnings({"ConstantConditions", "NullAway"})
 	private HttpHeaders getHeaders() {
 		if (this.headers == null) {
-			this.headers = HttpHeaders.writableHttpHeaders(this.originalResponse.headers().asHttpHeaders());
+			this.headers = new HttpHeaders(this.originalResponse.headers().asHttpHeaders());
 		}
 		return this.headers;
 	}
@@ -164,7 +166,7 @@ final class DefaultClientResponseBuilder implements ClientResponse.Builder {
 		return this;
 	}
 
-	@SuppressWarnings("ConstantConditions")
+	@SuppressWarnings({"ConstantConditions", "NullAway"})
 	private MultiValueMap<String, ResponseCookie> getCookies() {
 		if (this.cookies == null) {
 			this.cookies = new LinkedMultiValueMap<>(this.originalResponse.cookies());
@@ -217,14 +219,14 @@ final class DefaultClientResponseBuilder implements ClientResponse.Builder {
 
 		return new DefaultClientResponse(httpResponse, this.strategies,
 				this.originalResponse != null ? this.originalResponse.logPrefix() : "",
-				this.request.getMethod() + " " + this.request.getURI(),
+				WebClientUtils.getRequestDescription(this.request.getMethod(), this.request.getURI()),
 				() -> this.request);
 	}
 
 
 	private static class BuiltClientHttpResponse implements ClientHttpResponse {
 
-		private final int statusCode;
+		private final HttpStatusCode statusCode;
 
 		@Nullable
 		private final HttpHeaders headers;
@@ -238,7 +240,7 @@ final class DefaultClientResponseBuilder implements ClientResponse.Builder {
 		private final ClientResponse originalResponse;
 
 
-		BuiltClientHttpResponse(int statusCode, @Nullable HttpHeaders headers,
+		BuiltClientHttpResponse(HttpStatusCode statusCode, @Nullable HttpHeaders headers,
 				@Nullable MultiValueMap<String, ResponseCookie> cookies, Flux<DataBuffer> body,
 				@Nullable ClientResponse originalResponse) {
 
@@ -256,23 +258,18 @@ final class DefaultClientResponseBuilder implements ClientResponse.Builder {
 		}
 
 		@Override
-		public HttpStatus getStatusCode() {
-			return HttpStatus.valueOf(this.statusCode);
-		}
-
-		@Override
-		public int getRawStatusCode() {
+		public HttpStatusCode getStatusCode() {
 			return this.statusCode;
 		}
 
 		@Override
-		@SuppressWarnings("ConstantConditions")
+		@SuppressWarnings({"ConstantConditions", "NullAway"})
 		public HttpHeaders getHeaders() {
 			return (this.headers != null ? this.headers : this.originalResponse.headers().asHttpHeaders());
 		}
 
 		@Override
-		@SuppressWarnings("ConstantConditions")
+		@SuppressWarnings({"ConstantConditions", "NullAway"})
 		public MultiValueMap<String, ResponseCookie> getCookies() {
 			return (this.cookies != null ? this.cookies : this.originalResponse.cookies());
 		}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,14 +60,14 @@ public class AspectMetadata implements Serializable {
 	private final Class<?> aspectClass;
 
 	/**
-	 * AspectJ reflection information (AspectJ 5 / Java 5 specific).
-	 * Re-resolved on deserialization since it isn't serializable itself.
+	 * AspectJ reflection information.
+	 * <p>Re-resolved on deserialization since it isn't serializable itself.
 	 */
 	private transient AjType<?> ajType;
 
 	/**
 	 * Spring AOP pointcut corresponding to the per clause of the
-	 * aspect. Will be the Pointcut.TRUE canonical instance in the
+	 * aspect. Will be the {@code Pointcut.TRUE} canonical instance in the
 	 * case of a singleton, otherwise an AspectJExpressionPointcut.
 	 */
 	private final Pointcut perClausePointcut;
@@ -124,10 +124,16 @@ public class AspectMetadata implements Serializable {
 	 * Extract contents from String of form {@code pertarget(contents)}.
 	 */
 	private String findPerClause(Class<?> aspectClass) {
-		String str = aspectClass.getAnnotation(Aspect.class).value();
-		int beginIndex = str.indexOf('(') + 1;
-		int endIndex = str.length() - 1;
-		return str.substring(beginIndex, endIndex);
+		Aspect ann = aspectClass.getAnnotation(Aspect.class);
+		if (ann == null) {
+			return "";
+		}
+		String value = ann.value();
+		int beginIndex = value.indexOf('(');
+		if (beginIndex < 0) {
+			return "";
+		}
+		return value.substring(beginIndex + 1, value.length() - 1);
 	}
 
 

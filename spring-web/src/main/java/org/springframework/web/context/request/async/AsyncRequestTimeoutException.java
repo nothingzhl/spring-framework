@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@
 package org.springframework.web.context.request.async;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.ErrorResponse;
 
@@ -36,14 +37,17 @@ import org.springframework.web.ErrorResponse;
 @SuppressWarnings("serial")
 public class AsyncRequestTimeoutException extends RuntimeException implements ErrorResponse {
 
+	private final ProblemDetail body = ProblemDetail.forStatus(getStatusCode());
+
+
 	@Override
-	public int getRawStatusCode() {
-		return HttpStatus.SERVICE_UNAVAILABLE.value();
+	public HttpStatusCode getStatusCode() {
+		return HttpStatus.SERVICE_UNAVAILABLE;
 	}
 
 	@Override
 	public ProblemDetail getBody() {
-		return ProblemDetail.forRawStatusCode(getRawStatusCode());
+		return this.body;
 	}
 
 }

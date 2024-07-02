@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2022 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,9 +40,13 @@ import org.springframework.http.client.reactive.ClientHttpRequest;
 import org.springframework.http.codec.ClientCodecConfigurer;
 import org.springframework.http.codec.ServerCodecConfigurer;
 import org.springframework.lang.Nullable;
+import org.springframework.test.json.JsonComparator;
+import org.springframework.test.json.JsonCompareMode;
+import org.springframework.test.json.JsonComparison;
 import org.springframework.util.MultiValueMap;
 import org.springframework.validation.Validator;
 import org.springframework.web.reactive.accept.RequestedContentTypeResolverBuilder;
+import org.springframework.web.reactive.config.BlockingExecutionConfigurer;
 import org.springframework.web.reactive.config.CorsRegistry;
 import org.springframework.web.reactive.config.PathMatchConfigurer;
 import org.springframework.web.reactive.config.ViewResolverRegistry;
@@ -75,14 +79,6 @@ import org.springframework.web.util.UriBuilderFactory;
  * <li>{@link #bindToServer()}
  * <li>...
  * </ul>
- *
- * <p><strong>Warning</strong>: {@code WebTestClient} is not usable yet in
- * Kotlin due to a <a href="https://youtrack.jetbrains.com/issue/KT-5464">type inference issue</a>
- * which is expected to be fixed as of Kotlin 1.3. You can watch
- * <a href="https://github.com/spring-projects/spring-framework/issues/20606">gh-20606</a>
- * for up-to-date information. Meanwhile, the proposed alternative is to use
- * directly {@link WebClient} with its Reactor and Spring Kotlin extensions to
- * perform integration tests on an embedded WebFlux server.
  *
  * @author Rossen Stoyanchev
  * @author Brian Clozel
@@ -180,7 +176,7 @@ public interface WebTestClient {
 	 * There are builder methods to customize the Java config. The resulting
 	 * WebFlux application will be tested without an HTTP server using a mock
 	 * request and response.
-	 * @param controllers one or more controller instances to tests
+	 * @param controllers one or more controller instances to test
 	 * (specified {@code Class} will be turned into instance)
 	 * @return chained API to customize server and client config; use
 	 * {@link MockServerSpec#configureClient()} to transition to client config
@@ -203,7 +199,7 @@ public interface WebTestClient {
 	}
 
 	/**
-	 * Use this option to setup a server from the Spring configuration of your
+	 * Use this option to set up a server from the Spring configuration of your
 	 * application, or some subset of it. Internally the provided configuration
 	 * is passed to {@code WebHttpHandlerBuilder} to set up the request
 	 * processing chain. The resulting WebFlux application will be tested
@@ -353,6 +349,13 @@ public interface WebTestClient {
 		 * @see WebFluxConfigurer#configureViewResolvers
 		 */
 		ControllerSpec viewResolvers(Consumer<ViewResolverRegistry> consumer);
+
+		/**
+		 * Configure blocking execution options.
+		 * @since 6.1
+		 * @see WebFluxConfigurer#configureBlockingExecution
+		 */
+		ControllerSpec blockingExecution(Consumer<BlockingExecutionConfigurer> consumer);
 	}
 
 
@@ -503,6 +506,18 @@ public interface WebTestClient {
 		 * @param timeout the response timeout value
 		 */
 		Builder responseTimeout(Duration timeout);
+
+		/**
+		 * Set the {@link ClientHttpConnector} to use.
+		 * <p>By default, this is initialized and set internally. However, the
+		 * connector may also be prepared externally and passed via
+		 * {@link WebTestClient#bindToServer(ClientHttpConnector)} such as for
+		 * {@code MockMvcWebTestClient} tests, and in that case you can use this
+		 * from {@link #mutateWith(WebTestClientConfigurer)} to replace it.
+		 * @param connector the connector to use
+		 * @since 6.1
+		 */
+		Builder clientConnector(ClientHttpConnector connector);
 
 		/**
 		 * Apply the given configurer to this builder instance.
@@ -796,7 +811,7 @@ public interface WebTestClient {
 		 * <p>If a single {@link Error} or {@link RuntimeException} is thrown,
 		 * it will be rethrown.
 		 * <p>If multiple exceptions are thrown, this method will throw an
-		 * {@link AssertionError} whose error message is a summary of all of the
+		 * {@link AssertionError} whose error message is a summary of all the
 		 * exceptions. In addition, each exception will be added as a
 		 * {@linkplain Throwable#addSuppressed(Throwable) suppressed exception} to
 		 * the {@code AssertionError}.
@@ -985,10 +1000,10 @@ public interface WebTestClient {
 		 * <a href="https://jsonassert.skyscreamer.org/">JSONassert</a> library
 		 * to be on the classpath.
 		 * @param expectedJson the expected JSON content
-		 * @see #json(String, boolean)
+		 * @see #json(String, JsonCompareMode)
 		 */
 		default BodyContentSpec json(String expectedJson) {
-			return json(expectedJson, false);
+			return json(expectedJson, JsonCompareMode.LENIENT);
 		}
 
 		/**
@@ -1007,8 +1022,36 @@ public interface WebTestClient {
 		 * @param strict enables strict checking if {@code true}
 		 * @since 5.3.16
 		 * @see #json(String)
+		 * @deprecated in favor of {@link #json(String, JsonCompareMode)}
 		 */
+		@Deprecated(since = "6.2")
 		BodyContentSpec json(String expectedJson, boolean strict);
+
+		/**
+		 * Parse the expected and actual response content as JSON and perform a
+		 * comparison using the given {@linkplain JsonCompareMode mode}. If the
+		 * comparison failed, throws an {@link AssertionError} with the message
+		 * of the {@link JsonComparison}.
+		 * <p>Use of this method requires the
+		 * <a href="https://jsonassert.skyscreamer.org/">JSONassert</a> library
+		 * to be on the classpath.
+		 * @param expectedJson the expected JSON content
+		 * @param compareMode the compare mode
+		 * @since 6.2
+		 * @see #json(String)
+		 */
+		BodyContentSpec json(String expectedJson, JsonCompareMode compareMode);
+
+		/**
+		 * Parse the expected and actual response content as JSON and perform a
+		 * comparison using the given {@link JsonComparator}. If the comparison
+		 * failed, throws an {@link AssertionError} with the message  of the
+		 * {@link JsonComparison}.
+		 * @param expectedJson the expected JSON content
+		 * @param comparator the comparator to use
+		 * @since 6.2
+		 */
+		BodyContentSpec json(String expectedJson, JsonComparator comparator);
 
 		/**
 		 * Parse expected and actual response content as XML and assert that
@@ -1017,7 +1060,7 @@ public interface WebTestClient {
 		 * <p>Use of this method requires the
 		 * <a href="https://github.com/xmlunit/xmlunit">XMLUnit</a> library on
 		 * the classpath.
-		 * @param expectedXml the expected JSON content.
+		 * @param expectedXml the expected XML content.
 		 * @since 5.1
 		 * @see org.springframework.test.util.XmlExpectationsHelper#assertXmlEqual(String, String)
 		 */
@@ -1027,11 +1070,22 @@ public interface WebTestClient {
 		 * Access to response body assertions using a
 		 * <a href="https://github.com/jayway/JsonPath">JsonPath</a> expression
 		 * to inspect a specific subset of the body.
+		 * @param expression the JsonPath expression
+		 * @since 6.2
+		 */
+		JsonPathAssertions jsonPath(String expression);
+
+		/**
+		 * Access to response body assertions using a
+		 * <a href="https://github.com/jayway/JsonPath">JsonPath</a> expression
+		 * to inspect a specific subset of the body.
 		 * <p>The JSON path expression can be a parameterized string using
 		 * formatting specifiers as defined in {@link String#format}.
 		 * @param expression the JsonPath expression
 		 * @param args arguments to parameterize the expression
+		 * @deprecated in favor of calling {@link String#formatted(Object...)} upfront
 		 */
+		@Deprecated(since = "6.2", forRemoval = true)
 		JsonPathAssertions jsonPath(String expression, Object... args);
 
 		/**
