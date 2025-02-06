@@ -19,8 +19,8 @@ package org.springframework.web.servlet.view.freemarker;
 import java.util.Locale;
 
 import freemarker.template.Configuration;
+import org.jspecify.annotations.Nullable;
 
-import org.springframework.lang.Nullable;
 import org.springframework.util.StringUtils;
 import org.springframework.web.servlet.View;
 import org.springframework.web.servlet.view.AbstractTemplateViewResolver;
@@ -47,7 +47,7 @@ import org.springframework.web.servlet.view.AbstractUrlBasedView;
  * check for the existence of the specified template resources and only return
  * a non-null {@code View} object if the template was actually found.
  *
- * <p>Note: Spring's FreeMarker support requires FreeMarker 2.3.26 or higher.
+ * <p>Note: Spring's FreeMarker support requires FreeMarker 2.3.33 or higher.
  *
  * @author Juergen Hoeller
  * @author Sam Brannen
@@ -105,8 +105,7 @@ public class FreeMarkerViewResolver extends AbstractTemplateViewResolver {
 	 * @see #postProcessView(FreeMarkerView)
 	 */
 	@Override
-	@Nullable
-	protected View loadView(String viewName, Locale locale) throws Exception {
+	protected @Nullable View loadView(String viewName, Locale locale) throws Exception {
 		View view = super.loadView(viewName, locale);
 		if (view instanceof FreeMarkerView freeMarkerView) {
 			postProcessView(freeMarkerView);

@@ -27,6 +27,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.aopalliance.aop.Advice;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.aop.Advisor;
 import org.springframework.aop.DynamicIntroductionAdvice;
@@ -34,12 +35,12 @@ import org.springframework.aop.IntroductionAdvisor;
 import org.springframework.aop.IntroductionInfo;
 import org.springframework.aop.Pointcut;
 import org.springframework.aop.PointcutAdvisor;
+import org.springframework.aop.SpringProxy;
 import org.springframework.aop.TargetSource;
 import org.springframework.aop.support.DefaultIntroductionAdvisor;
 import org.springframework.aop.support.DefaultPointcutAdvisor;
 import org.springframework.aop.target.EmptyTargetSource;
 import org.springframework.aop.target.SingletonTargetSource;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.CollectionUtils;
@@ -78,24 +79,28 @@ public class AdvisedSupport extends ProxyConfig implements Advised {
 
 
 	/** Package-protected to allow direct access for efficiency. */
+	@SuppressWarnings("serial")
 	TargetSource targetSource = EMPTY_TARGET_SOURCE;
 
 	/** Whether the Advisors are already filtered for the specific target class. */
 	private boolean preFiltered = false;
 
 	/** The AdvisorChainFactory to use. */
+	@SuppressWarnings("serial")
 	private AdvisorChainFactory advisorChainFactory = DefaultAdvisorChainFactory.INSTANCE;
 
 	/**
 	 * Interfaces to be implemented by the proxy. Held in List to keep the order
 	 * of registration, to create JDK proxy with specified order of interfaces.
 	 */
+	@SuppressWarnings("serial")
 	private List<Class<?>> interfaces = new ArrayList<>();
 
 	/**
 	 * List of Advisors. If an Advice is added, it will be wrapped
 	 * in an Advisor before being added to this List.
 	 */
+	@SuppressWarnings("serial")
 	private List<Advisor> advisors = new ArrayList<>();
 
 	/**
@@ -104,15 +109,14 @@ public class AdvisedSupport extends ProxyConfig implements Advised {
 	 * @since 6.0.10
 	 * @see #reduceToAdvisorKey
 	 */
+	@SuppressWarnings("serial")
 	private List<Advisor> advisorKey = this.advisors;
 
 	/** Cache with Method as key and advisor chain List as value. */
-	@Nullable
-	private transient Map<MethodCacheKey, List<Object>> methodCache;
+	private transient @Nullable Map<MethodCacheKey, List<Object>> methodCache;
 
 	/** Cache with shared interceptors which are not method-specific. */
-	@Nullable
-	private transient volatile List<Object> cachedInterceptors;
+	private transient volatile @Nullable List<Object> cachedInterceptors;
 
 	/**
 	 * Optional field for {@link AopProxy} implementations to store metadata in.
@@ -120,8 +124,7 @@ public class AdvisedSupport extends ProxyConfig implements Advised {
 	 * @since 6.1.3
 	 * @see JdkDynamicAopProxy#JdkDynamicAopProxy(AdvisedSupport)
 	 */
-	@Nullable
-	transient volatile Object proxyMetadataCache;
+	transient volatile @Nullable Object proxyMetadataCache;
 
 
 	/**
@@ -177,8 +180,7 @@ public class AdvisedSupport extends ProxyConfig implements Advised {
 	}
 
 	@Override
-	@Nullable
-	public Class<?> getTargetClass() {
+	public @Nullable Class<?> getTargetClass() {
 		return this.targetSource.getTargetClass();
 	}
 
@@ -222,15 +224,15 @@ public class AdvisedSupport extends ProxyConfig implements Advised {
 
 	/**
 	 * Add a new proxied interface.
-	 * @param intf the additional interface to proxy
+	 * @param ifc the additional interface to proxy
 	 */
-	public void addInterface(Class<?> intf) {
-		Assert.notNull(intf, "Interface must not be null");
-		if (!intf.isInterface()) {
-			throw new IllegalArgumentException("[" + intf.getName() + "] is not an interface");
+	public void addInterface(Class<?> ifc) {
+		Assert.notNull(ifc, "Interface must not be null");
+		if (!ifc.isInterface()) {
+			throw new IllegalArgumentException("[" + ifc.getName() + "] is not an interface");
 		}
-		if (!this.interfaces.contains(intf)) {
-			this.interfaces.add(intf);
+		if (!this.interfaces.contains(ifc)) {
+			this.interfaces.add(ifc);
 			adviceChanged();
 		}
 	}
@@ -238,12 +240,12 @@ public class AdvisedSupport extends ProxyConfig implements Advised {
 	/**
 	 * Remove a proxied interface.
 	 * <p>Does nothing if the given interface isn't proxied.
-	 * @param intf the interface to remove from the proxy
+	 * @param ifc the interface to remove from the proxy
 	 * @return {@code true} if the interface was removed; {@code false}
 	 * if the interface was not found and hence could not be removed
 	 */
-	public boolean removeInterface(Class<?> intf) {
-		return this.interfaces.remove(intf);
+	public boolean removeInterface(Class<?> ifc) {
+		return this.interfaces.remove(ifc);
 	}
 
 	@Override
@@ -252,10 +254,32 @@ public class AdvisedSupport extends ProxyConfig implements Advised {
 	}
 
 	@Override
-	public boolean isInterfaceProxied(Class<?> intf) {
+	public boolean isInterfaceProxied(Class<?> ifc) {
 		for (Class<?> proxyIntf : this.interfaces) {
-			if (intf.isAssignableFrom(proxyIntf)) {
+			if (ifc.isAssignableFrom(proxyIntf)) {
 				return true;
+			}
+		}
+		return false;
+	}
+
+	boolean hasUserSuppliedInterfaces() {
+		for (Class<?> ifc : this.interfaces) {
+			if (!SpringProxy.class.isAssignableFrom(ifc) && !isAdvisorIntroducedInterface(ifc)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private boolean isAdvisorIntroducedInterface(Class<?> ifc) {
+		for (Advisor advisor : this.advisors) {
+			if (advisor instanceof IntroductionAdvisor introductionAdvisor) {
+				for (Class<?> introducedInterface : introductionAdvisor.getInterfaces()) {
+					if (introducedInterface == ifc) {
+						return true;
+					}
+				}
 			}
 		}
 		return false;
@@ -645,7 +669,8 @@ public class AdvisedSupport extends ProxyConfig implements Advised {
 
 		@Override
 		public boolean equals(@Nullable Object other) {
-			return (this == other || (other instanceof MethodCacheKey that && this.method == that.method));
+			return (this == other || (other instanceof MethodCacheKey that &&
+					(this.method == that.method || this.method.equals(that.method))));
 		}
 
 		@Override
@@ -681,11 +706,9 @@ public class AdvisedSupport extends ProxyConfig implements Advised {
 
 		private final Class<?> adviceType;
 
-		@Nullable
-		private final String classFilterKey;
+		private final @Nullable String classFilterKey;
 
-		@Nullable
-		private final String methodMatcherKey;
+		private final @Nullable String methodMatcherKey;
 
 		public AdvisorKeyEntry(Advisor advisor) {
 			this.adviceType = advisor.getAdvice().getClass();

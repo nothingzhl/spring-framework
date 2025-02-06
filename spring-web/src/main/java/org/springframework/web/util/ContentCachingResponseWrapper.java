@@ -30,9 +30,9 @@ import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.WriteListener;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpServletResponseWrapper;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.http.HttpHeaders;
-import org.springframework.lang.Nullable;
 import org.springframework.util.FastByteArrayOutputStream;
 
 /**
@@ -40,7 +40,7 @@ import org.springframework.util.FastByteArrayOutputStream;
  * the {@linkplain #getOutputStream() output stream} and {@linkplain #getWriter() writer},
  * and allows this content to be retrieved via a {@linkplain #getContentAsByteArray() byte array}.
  *
- * <p>Used e.g. by {@link org.springframework.web.filter.ShallowEtagHeaderFilter}.
+ * <p>Used, for example, by {@link org.springframework.web.filter.ShallowEtagHeaderFilter}.
  *
  * @author Juergen Hoeller
  * @author Sam Brannen
@@ -51,14 +51,11 @@ public class ContentCachingResponseWrapper extends HttpServletResponseWrapper {
 
 	private final FastByteArrayOutputStream content = new FastByteArrayOutputStream(1024);
 
-	@Nullable
-	private ServletOutputStream outputStream;
+	private @Nullable ServletOutputStream outputStream;
 
-	@Nullable
-	private PrintWriter writer;
+	private @Nullable PrintWriter writer;
 
-	@Nullable
-	private Integer contentLength;
+	private @Nullable Integer contentLength;
 
 
 	/**
@@ -140,11 +137,15 @@ public class ContentCachingResponseWrapper extends HttpServletResponseWrapper {
 
 	@Override
 	public void setContentLengthLong(long len) {
-		if (len > Integer.MAX_VALUE) {
+		setContentLength(toContentLengthInt(len));
+	}
+
+	private int toContentLengthInt(long contentLength) {
+		if (contentLength > Integer.MAX_VALUE) {
 			throw new IllegalArgumentException("Content-Length exceeds ContentCachingResponseWrapper's maximum (" +
-					Integer.MAX_VALUE + "): " + len);
+					Integer.MAX_VALUE + "): " + contentLength);
 		}
-		setContentLength((int) len);
+		return (int) contentLength;
 	}
 
 	@Override
@@ -160,7 +161,7 @@ public class ContentCachingResponseWrapper extends HttpServletResponseWrapper {
 	@Override
 	public void setHeader(String name, String value) {
 		if (HttpHeaders.CONTENT_LENGTH.equalsIgnoreCase(name)) {
-			this.contentLength = Integer.valueOf(value);
+			this.contentLength = toContentLengthInt(Long.parseLong(value));
 		}
 		else {
 			super.setHeader(name, value);
@@ -170,7 +171,7 @@ public class ContentCachingResponseWrapper extends HttpServletResponseWrapper {
 	@Override
 	public void addHeader(String name, String value) {
 		if (HttpHeaders.CONTENT_LENGTH.equalsIgnoreCase(name)) {
-			this.contentLength = Integer.valueOf(value);
+			this.contentLength = toContentLengthInt(Long.parseLong(value));
 		}
 		else {
 			super.addHeader(name, value);
@@ -180,7 +181,7 @@ public class ContentCachingResponseWrapper extends HttpServletResponseWrapper {
 	@Override
 	public void setIntHeader(String name, int value) {
 		if (HttpHeaders.CONTENT_LENGTH.equalsIgnoreCase(name)) {
-			this.contentLength = Integer.valueOf(value);
+			this.contentLength = value;
 		}
 		else {
 			super.setIntHeader(name, value);
@@ -190,7 +191,7 @@ public class ContentCachingResponseWrapper extends HttpServletResponseWrapper {
 	@Override
 	public void addIntHeader(String name, int value) {
 		if (HttpHeaders.CONTENT_LENGTH.equalsIgnoreCase(name)) {
-			this.contentLength = Integer.valueOf(value);
+			this.contentLength = value;
 		}
 		else {
 			super.addIntHeader(name, value);
@@ -198,8 +199,7 @@ public class ContentCachingResponseWrapper extends HttpServletResponseWrapper {
 	}
 
 	@Override
-	@Nullable
-	public String getHeader(String name) {
+	public @Nullable String getHeader(String name) {
 		if (this.contentLength != null && HttpHeaders.CONTENT_LENGTH.equalsIgnoreCase(name)) {
 			return this.contentLength.toString();
 		}

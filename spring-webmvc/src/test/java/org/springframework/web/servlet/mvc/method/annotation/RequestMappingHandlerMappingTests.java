@@ -23,8 +23,6 @@ import java.lang.annotation.Target;
 import java.lang.reflect.Method;
 import java.security.Principal;
 import java.util.Collections;
-import java.util.HashSet;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -35,7 +33,6 @@ import org.springframework.core.annotation.AliasFor;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.util.ClassUtils;
-import org.springframework.web.accept.ContentNegotiationManager;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -60,6 +57,8 @@ import org.springframework.web.util.pattern.PathPatternParser;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
+import static org.junit.jupiter.api.Named.named;
+import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -83,7 +82,10 @@ class RequestMappingHandlerMappingTests {
 		mapping2.setPatternParser(null);
 		mapping2.setApplicationContext(wac2);
 
-		return Stream.of(Arguments.of(mapping1, wac1), Arguments.of(mapping2, wac2));
+		return Stream.of(
+				arguments(named("PathPatternParser", mapping1), wac1),
+				arguments(named("AntPathMatcher", mapping2), wac2)
+			);
 	}
 
 	@Test
@@ -95,74 +97,6 @@ class RequestMappingHandlerMappingTests {
 
 		mapping.afterPropertiesSet();
 		assertThat(mapping.getBuilderConfiguration()).isNotNull().isNotSameAs(config);
-	}
-
-	@Test
-	@SuppressWarnings("deprecation")
-	void useRegisteredSuffixPatternMatch() {
-		RequestMappingHandlerMapping mapping = createMapping();
-
-		Map<String, MediaType> fileExtensions = Collections.singletonMap("json", MediaType.APPLICATION_JSON);
-		org.springframework.web.accept.PathExtensionContentNegotiationStrategy strategy =
-				new org.springframework.web.accept.PathExtensionContentNegotiationStrategy(fileExtensions);
-		ContentNegotiationManager manager = new ContentNegotiationManager(strategy);
-
-		mapping.setContentNegotiationManager(manager);
-		mapping.setUseRegisteredSuffixPatternMatch(true);
-		mapping.afterPropertiesSet();
-
-		assertThat(mapping.useSuffixPatternMatch()).isTrue();
-		assertThat(mapping.useRegisteredSuffixPatternMatch()).isTrue();
-		assertThat(mapping.getFileExtensions()).isEqualTo(Collections.singletonList("json"));
-	}
-
-	@Test
-	@SuppressWarnings("deprecation")
-	void useRegisteredSuffixPatternMatchInitialization() {
-		Map<String, MediaType> fileExtensions = Collections.singletonMap("json", MediaType.APPLICATION_JSON);
-		org.springframework.web.accept.PathExtensionContentNegotiationStrategy strategy =
-				new org.springframework.web.accept.PathExtensionContentNegotiationStrategy(fileExtensions);
-		ContentNegotiationManager manager = new ContentNegotiationManager(strategy);
-
-		final Set<String> extensions = new HashSet<>();
-
-		RequestMappingHandlerMapping mapping = new RequestMappingHandlerMapping() {
-			@Override
-			protected RequestMappingInfo getMappingForMethod(Method method, Class<?> handlerType) {
-				extensions.addAll(getFileExtensions());
-				return super.getMappingForMethod(method, handlerType);
-			}
-		};
-
-		StaticWebApplicationContext wac = new StaticWebApplicationContext();
-		wac.registerSingleton("testController", ComposedAnnotationController.class);
-		wac.refresh();
-
-		mapping.setContentNegotiationManager(manager);
-		mapping.setUseRegisteredSuffixPatternMatch(true);
-		mapping.setApplicationContext(wac);
-		mapping.afterPropertiesSet();
-
-		assertThat(extensions).containsOnly("json");
-	}
-
-	@Test
-	@SuppressWarnings("deprecation")
-	void suffixPatternMatchSettings() {
-		RequestMappingHandlerMapping mapping = createMapping();
-
-		assertThat(mapping.useSuffixPatternMatch()).isFalse();
-		assertThat(mapping.useRegisteredSuffixPatternMatch()).isFalse();
-
-		mapping.setUseRegisteredSuffixPatternMatch(false);
-		assertThat(mapping.useSuffixPatternMatch())
-				.as("'false' registeredSuffixPatternMatch shouldn't impact suffixPatternMatch")
-				.isFalse();
-
-		mapping.setUseRegisteredSuffixPatternMatch(true);
-		assertThat(mapping.useSuffixPatternMatch())
-				.as("'true' registeredSuffixPatternMatch should enable suffixPatternMatch")
-				.isTrue();
 	}
 
 	@PathPatternsParameterizedTest
@@ -209,6 +143,7 @@ class RequestMappingHandlerMappingTests {
 		assertThat(info.getActivePatternsCondition().getMatchingCondition(request)).isNull();
 	}
 
+	@SuppressWarnings("removal")
 	private void initRequestPath(RequestMappingHandlerMapping mapping, MockHttpServletRequest request) {
 		PathPatternParser parser = mapping.getPatternParser();
 		if (parser != null) {
@@ -431,6 +366,26 @@ class RequestMappingHandlerMappingTests {
 				.containsOnly(MediaType.valueOf("text/plain;charset=UTF-8"));
 	}
 
+	@SuppressWarnings("DataFlowIssue")
+	@Test
+	void httpExchangeWithCustomHeaders() throws Exception {
+		RequestMappingHandlerMapping mapping = createMapping();
+
+		RequestMappingInfo mappingInfo = mapping.getMappingForMethod(
+				HttpExchangeController.class.getMethod("customHeadersExchange"),
+				HttpExchangeController.class);
+
+		assertThat(mappingInfo.getPathPatternsCondition().getPatterns())
+				.extracting(PathPattern::toString)
+				.containsOnly("/exchange/headers");
+
+		assertThat(mappingInfo.getMethodsCondition().getMethods()).containsOnly(RequestMethod.GET);
+		assertThat(mappingInfo.getParamsCondition().getExpressions()).isEmpty();
+
+		assertThat(mappingInfo.getHeadersCondition().getExpressions().stream().map(Object::toString))
+				.containsExactly("h1=hv1", "!h2");
+	}
+
 	private static RequestMappingHandlerMapping createMapping() {
 		RequestMappingHandlerMapping mapping = new RequestMappingHandlerMapping();
 		mapping.setApplicationContext(new StaticWebApplicationContext());
@@ -543,6 +498,12 @@ class RequestMappingHandlerMappingTests {
 
 		@PostExchange(url = "/custom", contentType = "application/json", accept = "text/plain;charset=UTF-8")
 		public void customValuesExchange(){}
+
+		@HttpExchange(method="GET", url = "/headers",
+				headers = {"h1=hv1", "!h2", "Accept=application/ignored"})
+		public String customHeadersExchange() {
+			return "info";
+		}
 	}
 
 

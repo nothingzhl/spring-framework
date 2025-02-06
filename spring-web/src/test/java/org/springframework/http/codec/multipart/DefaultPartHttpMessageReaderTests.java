@@ -29,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
 import io.netty.buffer.PooledByteBufAllocator;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -48,15 +49,13 @@ import org.springframework.core.io.buffer.DataBufferFactory;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.core.io.buffer.NettyDataBufferFactory;
 import org.springframework.http.MediaType;
-import org.springframework.lang.Nullable;
 import org.springframework.web.testfixture.http.server.reactive.MockServerHttpRequest;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.singletonMap;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Named.named;
-import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.junit.jupiter.params.provider.Arguments.argumentSet;
 import static org.springframework.core.ResolvableType.forClass;
 import static org.springframework.core.io.buffer.DataBufferUtils.release;
 
@@ -104,7 +103,7 @@ class DefaultPartHttpMessageReaderTests {
 
 			StepVerifier.create(result)
 					.consumeNextWith(part -> {
-						assertThat(part.headers()).isEmpty();
+						assertThat(part.headers().isEmpty()).isTrue();
 						part.content().subscribe(DataBufferUtils::release);
 					})
 					.verifyComplete();
@@ -267,7 +266,7 @@ class DefaultPartHttpMessageReaderTests {
 		CountDownLatch latch = new CountDownLatch(1);
 		StepVerifier.create(result)
 				.consumeNextWith(part -> {
-					assertThat(part.headers()).containsEntry("Føø", Collections.singletonList("Bår"));
+					assertThat(part.headers().hasHeaderValues("Føø", Collections.singletonList("Bår"))).isTrue();
 					testPart(part, null, "This is plain ASCII text.", latch);
 				})
 				.verifyComplete();
@@ -430,7 +429,7 @@ class DefaultPartHttpMessageReaderTests {
 
 	@Retention(RetentionPolicy.RUNTIME)
 	@Target(ElementType.METHOD)
-	@ParameterizedTest(name = "[{index}] {0}")
+	@ParameterizedTest
 	@MethodSource("org.springframework.http.codec.multipart.DefaultPartHttpMessageReaderTests#messageReaders()")
 	@interface ParameterizedDefaultPartHttpMessageReaderTest {
 	}
@@ -443,8 +442,8 @@ class DefaultPartHttpMessageReaderTests {
 		onDisk.setMaxInMemorySize(100);
 
 		return Stream.of(
-				arguments(named("in-memory", inMemory)),
-				arguments(named("on-disk", onDisk)));
+				argumentSet("in-memory", inMemory),
+				argumentSet("on-disk", onDisk));
 	}
 
 }

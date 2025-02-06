@@ -16,31 +16,48 @@
 
 package org.springframework.web.servlet.mvc.method.annotation;
 
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.Constraint;
+import jakarta.validation.ConstraintValidator;
+import jakarta.validation.ConstraintValidatorContext;
+import jakarta.validation.ConstraintValidatorFactory;
 import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Payload;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
 import jakarta.validation.executable.ExecutableValidator;
 import jakarta.validation.metadata.BeanDescriptor;
+import org.hibernate.validator.constraintvalidation.spi.DefaultConstraintValidatorFactory;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.context.MessageSourceResolvable;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.StringHttpMessageConverter;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
 import org.springframework.validation.Errors;
-import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
 import org.springframework.validation.Validator;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import org.springframework.validation.beanvalidation.SpringValidatorAdapter;
+import org.springframework.validation.method.ParameterErrors;
 import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.WebDataBinder;
@@ -88,11 +105,17 @@ class MethodValidationTests {
 
 	private InvocationCountingValidator jakartaValidator;
 
+	private final TestConstraintValidator testConstraintValidator = new TestConstraintValidator();
+
 
 	@BeforeEach
 	void setup() throws Exception {
+		LocaleContextHolder.setDefaultLocale(Locale.UK);
+
 		LocalValidatorFactoryBean validatorBean = new LocalValidatorFactoryBean();
+		validatorBean.setConstraintValidatorFactory(new TestConstraintValidatorFactory(this.testConstraintValidator));
 		validatorBean.afterPropertiesSet();
+
 		this.jakartaValidator = new InvocationCountingValidator(validatorBean);
 
 		this.handlerAdapter = initHandlerAdapter(this.jakartaValidator);
@@ -118,6 +141,11 @@ class MethodValidationTests {
 				List.of(new StringHttpMessageConverter(), new MappingJackson2HttpMessageConverter()));
 		handlerAdapter.afterPropertiesSet();
 		return handlerAdapter;
+	}
+
+	@AfterEach
+	void reset() {
+		LocaleContextHolder.setDefaultLocale(null);
 	}
 
 
@@ -172,7 +200,7 @@ class MethodValidationTests {
 		assertThat(this.jakartaValidator.getValidationCount()).isEqualTo(1);
 		assertThat(this.jakartaValidator.getMethodValidationCount()).isEqualTo(1);
 
-		assertThat(ex.getAllValidationResults()).hasSize(2);
+		assertThat(ex.getParameterValidationResults()).hasSize(2);
 
 		assertBeanResult(ex.getBeanResults().get(0), "student", List.of("""
 			Field error in object 'student' on field 'name': rejected value [name=Faustino1234]; \
@@ -183,7 +211,7 @@ class MethodValidationTests {
 		));
 
 		assertValueResult(ex.getValueResults().get(0), 2, "123", List.of("""
-			org.springframework.context.support.DefaultMessageSourceResolvable: \
+			org.springframework.validation.beanvalidation.MethodValidationAdapter$ViolationMessageSourceResolvable: \
 			codes [Size.validController#handle.myHeader,Size.myHeader,Size.java.lang.String,Size]; \
 			arguments [org.springframework.context.support.DefaultMessageSourceResolvable: \
 			codes [validController#handle.myHeader,myHeader]; arguments []; default message [myHeader],10,5]; \
@@ -227,7 +255,7 @@ class MethodValidationTests {
 		assertThat(this.jakartaValidator.getValidationCount()).isEqualTo(1);
 		assertThat(this.jakartaValidator.getMethodValidationCount()).isEqualTo(1);
 
-		assertThat(ex.getAllValidationResults()).hasSize(2);
+		assertThat(ex.getParameterValidationResults()).hasSize(2);
 
 		assertBeanResult(ex.getBeanResults().get(0), "personList", List.of("""
 			Field error in object 'personList' on field 'name': rejected value [Faustino1234]; \
@@ -286,6 +314,30 @@ class MethodValidationTests {
 			arguments []; default message [length must be 10 or under]""");
 	}
 
+	@Test // gh-34105
+	void typeConstraint() {
+		this.testConstraintValidator.setReject(true);
+
+		HandlerMethod hm = handlerMethod(new ValidController(), c -> c.handle(mockPerson, ""));
+		this.request.addHeader("header", "12345");
+		this.request.setContentType("application/json");
+		this.request.setContent("{\"name\":\"Faustino\"}".getBytes(UTF_8));
+
+		HandlerMethodValidationException ex = catchThrowableOfType(HandlerMethodValidationException.class,
+				() -> this.handlerAdapter.handle(this.request, this.response, hm));
+
+		List<ParameterValidationResult> results = ex.getParameterValidationResults();
+		assertThat(results).hasSize(1);
+		ParameterValidationResult result = results.get(0);
+		assertThat(result).isInstanceOf(ParameterErrors.class);
+
+		assertBeanResult((Errors) result, "person", List.of("""
+			Error in object 'person': codes [TestConstraint.person,TestConstraint]; \
+			arguments [org.springframework.context.support.DefaultMessageSourceResolvable: \
+			codes [person]; arguments []; default message []]; default message [Fail message]\
+			"""
+		));
+	}
 
 	@SuppressWarnings("unchecked")
 	private static <T> HandlerMethod handlerMethod(T controller, Consumer<T> mockCallConsumer) {
@@ -296,8 +348,8 @@ class MethodValidationTests {
 	@SuppressWarnings("SameParameterValue")
 	private static void assertBeanResult(Errors errors, String objectName, List<String> fieldErrors) {
 		assertThat(errors.getObjectName()).isEqualTo(objectName);
-		assertThat(errors.getFieldErrors())
-				.extracting(FieldError::toString)
+		assertThat(errors.getAllErrors())
+				.extracting(ObjectError::toString)
 				.containsExactlyInAnyOrderElementsOf(fieldErrors);
 	}
 
@@ -313,6 +365,7 @@ class MethodValidationTests {
 	}
 
 
+	@TestConstraint
 	@SuppressWarnings("unused")
 	private record Person(@Size(min = 1, max = 10) @JsonProperty("name") String name) {
 
@@ -345,6 +398,9 @@ class MethodValidationTests {
 		}
 
 		void handle(@Valid @RequestBody List<Person> persons) {
+		}
+
+		void handle(@Valid @RequestBody Person person, @RequestHeader @Size(min=4) String header) {
 		}
 	}
 
@@ -464,6 +520,59 @@ class MethodValidationTests {
 
 		private void assertCountAndIncrement() {
 			assertThat(this.validationCount++).as("Too many calls to Bean Validation").isLessThan(this.maxInvocationsExpected);
+		}
+	}
+
+
+
+	@Constraint(validatedBy = TestConstraintValidator.class)
+	@Target({ElementType.TYPE})
+	@Retention(RetentionPolicy.RUNTIME)
+	public @interface TestConstraint {
+
+		String message() default "Fail message";
+
+		Class<?>[] groups() default {};
+
+		Class<? extends Payload>[] payload() default {};
+	}
+
+
+	private static class TestConstraintValidator implements ConstraintValidator<TestConstraint, Person> {
+
+		private boolean reject;
+
+		public void setReject(boolean reject) {
+			this.reject = reject;
+		}
+
+		@Override
+		public boolean isValid(Person person, ConstraintValidatorContext context) {
+			return !this.reject;
+		}
+	}
+
+
+	private static class TestConstraintValidatorFactory implements ConstraintValidatorFactory {
+
+		private final Map<Class<?>, ConstraintValidator<?, ?>> validators;
+
+		private final ConstraintValidatorFactory delegate = new DefaultConstraintValidatorFactory();
+
+		private TestConstraintValidatorFactory(ConstraintValidator<?, ?>... validators) {
+			this.validators = new LinkedHashMap<>(validators.length);
+			Arrays.stream(validators).forEach(validator -> this.validators.put(validator.getClass(), validator));
+		}
+
+		@SuppressWarnings("unchecked")
+		@Override
+		public <T extends ConstraintValidator<?, ?>> T getInstance(Class<T> aClass) {
+			ConstraintValidator<?, ?> validator = this.validators.get(aClass);
+			return (validator != null ? (T) validator : this.delegate.getInstance(aClass));
+		}
+
+		@Override
+		public void releaseInstance(ConstraintValidator<?, ?> constraintValidator) {
 		}
 	}
 

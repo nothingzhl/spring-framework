@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2023 the original author or authors.
+ * Copyright 2002-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,8 @@ import java.util.Properties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
@@ -36,21 +38,29 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
  */
 class StringUtilsTests {
 
-	@Test
-	void hasTextBlank() {
-		String blank = "          ";
-		assertThat(StringUtils.hasText(blank)).isFalse();
+	@ParameterizedTest
+	@ValueSource(strings = {"text", "  text  ", "  ", "\t", "\n text"})
+	void hasLengthForValidValues(String value) {
+		assertThat(StringUtils.hasLength(value)).isTrue();
 	}
 
-	@Test
-	void hasTextNullEmpty() {
-		assertThat(StringUtils.hasText(null)).isFalse();
-		assertThat(StringUtils.hasText("")).isFalse();
+	@ParameterizedTest
+	@NullAndEmptySource
+	void hasLengthForInvalidValues(String value) {
+		assertThat(StringUtils.hasLength(value)).isFalse();
 	}
 
-	@Test
-	void hasTextValid() {
-		assertThat(StringUtils.hasText("t")).isTrue();
+	@ParameterizedTest
+	@ValueSource(strings = {"text", "  text  ", "\n text"})
+	void hasTextForValidValues(String value) {
+		assertThat(StringUtils.hasText(value)).isTrue();
+	}
+
+	@ParameterizedTest
+	@NullAndEmptySource
+	@ValueSource(strings = {"  ", "\t"})
+	void hasTextForInvalidValues(String value) {
+		assertThat(StringUtils.hasText(value)).isFalse();
 	}
 
 	@Test
@@ -468,6 +478,18 @@ class StringUtilsTests {
 	}
 
 	@Test
+	void trimArrayElements() {
+		assertThat(StringUtils.trimArrayElements(null)).isNull();
+		assertThat(StringUtils.trimArrayElements(new String[] {})).isEmpty();
+		assertThat(StringUtils.trimArrayElements(new String[] { "", " ", "  ", "   " })).containsExactly("", "", "", "");
+		assertThat(StringUtils.trimArrayElements(new String[] { "\n", "\t ", "\n\t" })).containsExactly("", "", "");
+		assertThat(StringUtils.trimArrayElements(new String[] { "a", "b", "c" })).containsExactly("a", "b", "c");
+		assertThat(StringUtils.trimArrayElements(new String[] { "  a  ", "  b b ", "  cc  " })).containsExactly("a", "b b", "cc");
+		assertThat(StringUtils.trimArrayElements(new String[] { "  a  ", "b", "  c  " })).containsExactly("a", "b", "c");
+		assertThat(StringUtils.trimArrayElements(new String[] { null, "  a  ", null })).containsExactly(null, "a", null);
+	}
+
+	@Test
 	void removeDuplicateStrings() {
 		String[] input = new String[] {"myString2", "myString1", "myString2"};
 		input = StringUtils.removeDuplicateStrings(input);
@@ -556,6 +578,18 @@ class StringUtilsTests {
 		String[] sa = StringUtils.delimitedListToStringArray("a,b", null);
 		assertThat(sa).hasSize(1);
 		assertThat(sa[0]).isEqualTo("a,b");
+	}
+
+	@Test
+	void delimitedListToStringArrayWithCharacterToDelete() {
+		String[] sa = StringUtils.delimitedListToStringArray("a,b,c", ",", "a");
+		assertThat(sa).containsExactly("", "b", "c");
+	}
+
+	@Test
+	void delimitedListToStringArrayWithCharacterToDeleteEqualsToDelimiter() {
+		String[] sa = StringUtils.delimitedListToStringArray("a,b,c", ",", ",");
+		assertThat(sa).containsExactly("a", "b", "c");
 	}
 
 	@Test

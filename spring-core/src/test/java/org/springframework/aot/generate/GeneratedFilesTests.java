@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import javax.lang.model.element.Modifier;
 
 import org.assertj.core.api.AbstractStringAssert;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.aot.generate.GeneratedFiles.FileHandler;
@@ -34,7 +35,6 @@ import org.springframework.core.io.Resource;
 import org.springframework.javapoet.JavaFile;
 import org.springframework.javapoet.MethodSpec;
 import org.springframework.javapoet.TypeSpec;
-import org.springframework.lang.Nullable;
 import org.springframework.util.function.ThrowingConsumer;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -190,6 +190,7 @@ class GeneratedFilesTests {
 		AtomicBoolean called = new AtomicBoolean(false);
 		this.generatedFiles.handleFile(Kind.RESOURCE, "META-INF/test", handler -> {
 			called.set(true);
+			assertThat(handler.getContent()).isNotNull();
 			String existing = readSource(handler.getContent());
 			handler.override(createSource(existing+"-override"));
 		});
@@ -223,11 +224,11 @@ class GeneratedFilesTests {
 	}
 
 
-	static class TestGeneratedFiles extends GeneratedFiles {
+	static class TestGeneratedFiles implements GeneratedFiles {
 
-		private Kind kind;
+		private @Nullable Kind kind;
 
-		private String path;
+		private @Nullable String path;
 
 		private TestFileHandler fileHandler = new TestFileHandler();
 
@@ -247,32 +248,30 @@ class GeneratedFilesTests {
 			assertThat(this.kind).as("kind").isEqualTo(kind);
 			assertThat(this.path).as("path").isEqualTo(path);
 			assertThat(this.fileHandler.content).as("content").isNotNull();
-			return new GeneratedFileAssert(this.fileHandler);
+			return new GeneratedFileAssert(this.fileHandler.content, this.fileHandler.override);
 		}
 	}
 
 	private static class GeneratedFileAssert extends AbstractStringAssert<GeneratedFileAssert> {
 
-		private final TestFileHandler fileHandler;
+		private final @Nullable Boolean override;
 
-		GeneratedFileAssert(TestFileHandler fileHandler) throws IOException {
-			super(readSource(fileHandler.content), GeneratedFileAssert.class);
-			this.fileHandler = fileHandler;
+		GeneratedFileAssert(InputStreamSource content, @Nullable Boolean override) throws IOException {
+			super(readSource(content), GeneratedFileAssert.class);
+			this.override = override;
 		}
 
 		public GeneratedFileAssert hasOverride(boolean expected) {
-			assertThat(this.fileHandler.override).isEqualTo(expected);
+			assertThat(this.override).isEqualTo(expected);
 			return this.myself;
 		}
 	}
 
 	private static class TestFileHandler extends FileHandler {
 
-		@Nullable
-		private InputStreamSource content;
+		private @Nullable InputStreamSource content;
 
-		@Nullable
-		private Boolean override;
+		private @Nullable Boolean override;
 
 		TestFileHandler(@Nullable InputStreamSource content) {
 			super(content != null, () -> content);

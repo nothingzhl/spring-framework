@@ -21,12 +21,13 @@ import java.util.stream.Stream;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.jspecify.annotations.Nullable;
+import org.junit.jupiter.api.Named;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.RequestPath;
-import org.springframework.lang.Nullable;
 import org.springframework.web.HttpRequestHandler;
 import org.springframework.web.context.support.StaticWebApplicationContext;
 import org.springframework.web.cors.CorsConfiguration;
@@ -40,6 +41,7 @@ import org.springframework.web.util.ServletRequestPathUtils;
 import org.springframework.web.util.pattern.PathPatternParser;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Named.named;
 import static org.mockito.Mockito.mock;
 
 /**
@@ -51,8 +53,11 @@ import static org.mockito.Mockito.mock;
 class CorsAbstractHandlerMappingTests {
 
 	@SuppressWarnings("unused")
-	private static Stream<TestHandlerMapping> pathPatternsArguments() {
-		return Stream.of(new TestHandlerMapping(new PathPatternParser()), new TestHandlerMapping());
+	private static Stream<Named<TestHandlerMapping>> pathPatternsArguments() {
+		return Stream.of(
+				named("TestHandlerMapping with PathPatternParser", new TestHandlerMapping(new PathPatternParser())),
+				named("TestHandlerMapping without PathPatternParser", new TestHandlerMapping())
+			);
 	}
 
 
@@ -202,8 +207,7 @@ class CorsAbstractHandlerMappingTests {
 
 	private static class TestHandlerMapping extends AbstractHandlerMapping {
 
-		@Nullable
-		private CorsConfiguration savedCorsConfig;
+		private @Nullable CorsConfiguration savedCorsConfig;
 
 
 		TestHandlerMapping() {

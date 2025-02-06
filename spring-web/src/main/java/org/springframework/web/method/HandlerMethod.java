@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,7 @@ import java.util.stream.IntStream;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.context.MessageSource;
@@ -43,7 +44,6 @@ import org.springframework.core.annotation.MergedAnnotation;
 import org.springframework.core.annotation.MergedAnnotationPredicates;
 import org.springframework.core.annotation.MergedAnnotations;
 import org.springframework.http.HttpStatusCode;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
@@ -57,7 +57,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
  * method annotations, etc.
  *
  * <p>The class may be created with a bean instance or with a bean name
- * (e.g. lazy-init bean, prototype bean). Use {@link #createWithResolvedBean()}
+ * (for example, lazy-init bean, prototype bean). Use {@link #createWithResolvedBean()}
  * to obtain a {@code HandlerMethod} instance with a bean instance resolved
  * through the associated {@link BeanFactory}.
  *
@@ -75,11 +75,9 @@ public class HandlerMethod extends AnnotatedMethod {
 
 	private final Object bean;
 
-	@Nullable
-	private final BeanFactory beanFactory;
+	private final @Nullable BeanFactory beanFactory;
 
-	@Nullable
-	private final MessageSource messageSource;
+	private final @Nullable MessageSource messageSource;
 
 	private final Class<?> beanType;
 
@@ -87,14 +85,11 @@ public class HandlerMethod extends AnnotatedMethod {
 
 	private final boolean validateReturnValue;
 
-	@Nullable
-	private HttpStatusCode responseStatus;
+	private @Nullable HttpStatusCode responseStatus;
 
-	@Nullable
-	private String responseStatusReason;
+	private @Nullable String responseStatusReason;
 
-	@Nullable
-	private HandlerMethod resolvedFromHandlerMethod;
+	private @Nullable HandlerMethod resolvedFromHandlerMethod;
 
 	private final String description;
 
@@ -283,8 +278,7 @@ public class HandlerMethod extends AnnotatedMethod {
 	 * @since 4.3.8
 	 * @see ResponseStatus#code()
 	 */
-	@Nullable
-	protected HttpStatusCode getResponseStatus() {
+	protected @Nullable HttpStatusCode getResponseStatus() {
 		return this.responseStatus;
 	}
 
@@ -293,8 +287,7 @@ public class HandlerMethod extends AnnotatedMethod {
 	 * @since 4.3.8
 	 * @see ResponseStatus#reason()
 	 */
-	@Nullable
-	protected String getResponseStatusReason() {
+	protected @Nullable String getResponseStatusReason() {
 		return this.responseStatusReason;
 	}
 
@@ -302,8 +295,7 @@ public class HandlerMethod extends AnnotatedMethod {
 	 * Return the HandlerMethod from which this HandlerMethod instance was
 	 * resolved via {@link #createWithResolvedBean()}.
 	 */
-	@Nullable
-	public HandlerMethod getResolvedFromHandlerMethod() {
+	public @Nullable HandlerMethod getResolvedFromHandlerMethod() {
 		return this.resolvedFromHandlerMethod;
 	}
 
@@ -317,15 +309,19 @@ public class HandlerMethod extends AnnotatedMethod {
 	}
 
 	/**
-	 * If the provided instance contains a bean name rather than an object instance,
-	 * the bean name is resolved before a {@link HandlerMethod} is created and returned.
+	 * If the {@link #getBean() handler} is a bean name rather than the actual
+	 * handler instance, resolve the bean name through Spring configuration
+	 * (e.g. for prototype beans), and return a new {@link HandlerMethod}
+	 * instance with the resolved handler.
+	 * <p>If the {@link #getBean() handler} is not String, return the same instance.
 	 */
 	public HandlerMethod createWithResolvedBean() {
-		Object handler = this.bean;
-		if (this.bean instanceof String beanName) {
-			Assert.state(this.beanFactory != null, "Cannot resolve bean name without BeanFactory");
-			handler = this.beanFactory.getBean(beanName);
+		if (!(this.bean instanceof String beanName)) {
+			return this;
 		}
+
+		Assert.state(this.beanFactory != null, "Cannot resolve bean name without BeanFactory");
+		Object handler = this.beanFactory.getBean(beanName);
 		Assert.notNull(handler, "No handler instance");
 		return new HandlerMethod(this, handler, false);
 	}
@@ -365,23 +361,26 @@ public class HandlerMethod extends AnnotatedMethod {
 	 * beans, and others). {@code @Controller}'s that require proxying should prefer
 	 * class-based proxy mechanisms.
 	 */
-	protected void assertTargetBean(Method method, Object targetBean, Object[] args) {
+	protected void assertTargetBean(Method method, Object targetBean, @Nullable Object[] args) {
 		Class<?> methodDeclaringClass = method.getDeclaringClass();
 		Class<?> targetBeanClass = targetBean.getClass();
 		if (!methodDeclaringClass.isAssignableFrom(targetBeanClass)) {
 			String text = "The mapped handler method class '" + methodDeclaringClass.getName() +
 					"' is not an instance of the actual controller bean class '" +
 					targetBeanClass.getName() + "'. If the controller requires proxying " +
-					"(e.g. due to @Transactional), please use class-based proxying.";
+					"(for example, due to @Transactional), please use class-based proxying.";
 			throw new IllegalStateException(formatInvokeError(text, args));
 		}
 	}
 
-	protected String formatInvokeError(String text, Object[] args) {
+	protected String formatInvokeError(String text, @Nullable Object[] args) {
 		String formattedArgs = IntStream.range(0, args.length)
-				.mapToObj(i -> (args[i] != null ?
-						"[" + i + "] [type=" + args[i].getClass().getName() + "] [value=" + args[i] + "]" :
-						"[" + i + "] [null]"))
+				.mapToObj(i -> {
+					Object arg = args[i];
+					return (arg != null ?
+							"[" + i + "] [type=" +arg.getClass().getName() + "] [value=" + arg + "]" :
+							"[" + i + "] [null]");
+				})
 				.collect(Collectors.joining(",\n", " ", " "));
 		return text + "\n" +
 				"Controller [" + getBeanType().getName() + "]\n" +

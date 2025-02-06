@@ -20,15 +20,14 @@ import java.net.URI;
 import java.util.List;
 import java.util.Map;
 
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.core.ResolvableType;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.util.UriBuilderFactory;
@@ -42,11 +41,9 @@ import org.springframework.web.util.UriBuilderFactory;
  */
 public final class ReactiveHttpRequestValues extends HttpRequestValues {
 
-	@Nullable
-	private final Publisher<?> body;
+	private final @Nullable Publisher<?> body;
 
-	@Nullable
-	private final ParameterizedTypeReference<?> bodyElementType;
+	private final @Nullable ParameterizedTypeReference<?> bodyElementType;
 
 
 	private ReactiveHttpRequestValues(
@@ -67,39 +64,15 @@ public final class ReactiveHttpRequestValues extends HttpRequestValues {
 	 * <p>This is mutually exclusive with {@link #getBodyValue()}.
 	 * Only one of the two or neither is set.
 	 */
-	@Nullable
-	public Publisher<?> getBodyPublisher() {
+	public @Nullable Publisher<?> getBodyPublisher() {
 		return this.body;
 	}
 
 	/**
 	 * Return the element type for a {@linkplain #getBodyPublisher() body publisher}.
 	 */
-	@Nullable
-	public ParameterizedTypeReference<?> getBodyPublisherElementType() {
+	public @Nullable ParameterizedTypeReference<?> getBodyPublisherElementType() {
 		return this.bodyElementType;
-	}
-
-	/**
-	 * Return the request body as a {@link Publisher}.
-	 * <p>This is mutually exclusive with {@link #getBodyValue()}.
-	 * Only one of the two or neither is set.
-	 */
-	@Override
-	@SuppressWarnings("removal")
-	@Nullable
-	public Publisher<?> getBody() {
-		return getBodyPublisher();
-	}
-
-	/**
-	 * Return the element type for a {@linkplain #getBodyPublisher() body publisher}.
-	 */
-	@Override
-	@SuppressWarnings("removal")
-	@Nullable
-	public ParameterizedTypeReference<?> getBodyElementType() {
-		return getBodyPublisherElementType();
 	}
 
 
@@ -113,14 +86,11 @@ public final class ReactiveHttpRequestValues extends HttpRequestValues {
 	 */
 	public static final class Builder extends HttpRequestValues.Builder {
 
-		@Nullable
-		private MultipartBodyBuilder multipartBuilder;
+		private @Nullable MultipartBodyBuilder multipartBuilder;
 
-		@Nullable
-		private Publisher<?> body;
+		private @Nullable Publisher<?> body;
 
-		@Nullable
-		private ParameterizedTypeReference<?> bodyElementType;
+		private @Nullable ParameterizedTypeReference<?> bodyElementType;
 
 		@Override
 		public Builder setHttpMethod(HttpMethod httpMethod) {
@@ -211,12 +181,6 @@ public final class ReactiveHttpRequestValues extends HttpRequestValues {
 			return this;
 		}
 
-		@SuppressWarnings("removal")
-		@Override
-		public <T, P extends Publisher<T>> Builder addRequestPart(String name, P publisher, ResolvableType type) {
-			return addRequestPartPublisher(name, publisher, ParameterizedTypeReference.forType(type.getType()));
-		}
-
 		/**
 		 * {@inheritDoc}
 		 * <p>This is mutually exclusive with and resets any previously set
@@ -240,12 +204,6 @@ public final class ReactiveHttpRequestValues extends HttpRequestValues {
 			this.body = body;
 			this.bodyElementType = elementTye;
 			super.setBodyValue(null);
-		}
-
-		@SuppressWarnings("removal")
-		@Override
-		public <T, P extends Publisher<T>> void setBody(P body, ParameterizedTypeReference<T> elementTye) {
-			setBodyPublisher(body, elementTye);
 		}
 
 		@Override

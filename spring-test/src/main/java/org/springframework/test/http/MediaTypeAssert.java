@@ -20,10 +20,10 @@ import org.assertj.core.api.AbstractObjectAssert;
 import org.assertj.core.api.Assertions;
 import org.assertj.core.error.BasicErrorMessageFactory;
 import org.assertj.core.internal.Failures;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.http.InvalidMediaTypeException;
 import org.springframework.http.MediaType;
-import org.springframework.lang.Nullable;
 import org.springframework.util.StringUtils;
 
 /**
@@ -51,7 +51,7 @@ public class MediaTypeAssert extends AbstractObjectAssert<MediaTypeAssert, Media
 	 * representation.
 	 * @param mediaType the expected media type, as a String to be parsed
 	 * into a MediaType
-*/
+	 */
 	public MediaTypeAssert isEqualTo(String mediaType) {
 		return isEqualTo(parseMediaType(mediaType));
 	}
@@ -103,7 +103,6 @@ public class MediaTypeAssert extends AbstractObjectAssert<MediaTypeAssert, Media
 	}
 
 
-	@SuppressWarnings("NullAway")
 	private MediaType parseMediaType(String value) {
 		try {
 			return MediaType.parseMediaType(value);

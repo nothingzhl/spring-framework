@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import javax.lang.model.element.Modifier;
 
@@ -30,7 +31,6 @@ import org.springframework.aot.generate.GenerationContext;
 import org.springframework.aot.generate.MethodReference;
 import org.springframework.aot.generate.MethodReference.ArgumentCodeGenerator;
 import org.springframework.aot.generate.ValueCodeGenerationException;
-import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.test.generate.TestGenerationContext;
 import org.springframework.beans.factory.aot.BeanRegistrationsAotContribution.Registration;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
@@ -148,14 +148,11 @@ class BeanRegistrationsAotContributionTests {
 				registeredBean, null, List.of());
 		BeanRegistrationsAotContribution contribution = createContribution(registeredBean, generator);
 		contribution.applyTo(this.generationContext, this.beanFactoryInitializationCode);
-		assertThat(reflection().onType(Employee.class)
-				.withMemberCategories(MemberCategory.INTROSPECT_PUBLIC_METHODS, MemberCategory.INTROSPECT_DECLARED_METHODS))
+		assertThat(reflection().onType(Employee.class))
 				.accepts(this.generationContext.getRuntimeHints());
-		assertThat(reflection().onType(ITestBean.class)
-				.withMemberCategory(MemberCategory.INTROSPECT_PUBLIC_METHODS))
+		assertThat(reflection().onType(ITestBean.class))
 				.accepts(this.generationContext.getRuntimeHints());
-		assertThat(reflection().onType(AgeHolder.class)
-				.withMemberCategory(MemberCategory.INTROSPECT_PUBLIC_METHODS))
+		assertThat(reflection().onType(AgeHolder.class))
 				.accepts(this.generationContext.getRuntimeHints());
 	}
 
@@ -208,6 +205,59 @@ class BeanRegistrationsAotContributionTests {
 				.isThrownBy(() -> contribution.applyTo(this.generationContext, this.beanFactoryInitializationCode))
 				.withMessage("Error processing bean with name 'testBean': failed to generate code for bean definition")
 				.havingCause().isInstanceOf(IllegalStateException.class).withMessage("Test exception");
+	}
+
+	@Test
+	void applyToWithLessThanAThousandBeanDefinitionsDoesNotCreateSlices() {
+		BeanRegistrationsAotContribution contribution = createContribution(999, i -> "testBean" + i);
+		contribution.applyTo(this.generationContext, this.beanFactoryInitializationCode);
+		compile((consumer, compiled) -> {
+			assertThat(compiled.getSourceFile(".*BeanFactoryRegistrations"))
+					.doesNotContain("Register the bean definitions from 0 to 999.",
+							"// Registration is sliced to avoid exceeding size limit");
+			DefaultListableBeanFactory freshBeanFactory = new DefaultListableBeanFactory();
+			consumer.accept(freshBeanFactory);
+			for (int i = 0; i < 999; i++) {
+				String beanName = "testBean" + i;
+				assertThat(freshBeanFactory.containsBeanDefinition(beanName)).isTrue();
+				assertThat(freshBeanFactory.getBean(beanName)).isInstanceOf(TestBean.class);
+			}
+			assertThat(freshBeanFactory.getBeansOfType(TestBean.class)).hasSize(999);
+		});
+	}
+
+	@Test
+	void applyToWithLargeBeanDefinitionsCreatesSlices() {
+		BeanRegistrationsAotContribution contribution = createContribution(1001, i -> "testBean" + i);
+		contribution.applyTo(this.generationContext, this.beanFactoryInitializationCode);
+		compile((consumer, compiled) -> {
+			assertThat(compiled.getSourceFile(".*BeanFactoryRegistrations"))
+					.contains("Register the bean definitions from 0 to 999.",
+							"Register the bean definitions from 1000 to 1000.",
+							"// Registration is sliced to avoid exceeding size limit");
+			DefaultListableBeanFactory freshBeanFactory = new DefaultListableBeanFactory();
+			consumer.accept(freshBeanFactory);
+			for (int i = 0; i < 1001; i++) {
+				String beanName = "testBean" + i;
+				assertThat(freshBeanFactory.containsBeanDefinition(beanName)).isTrue();
+				assertThat(freshBeanFactory.getBean(beanName)).isInstanceOf(TestBean.class);
+			}
+			assertThat(freshBeanFactory.getBeansOfType(TestBean.class)).hasSize(1001);
+		});
+	}
+
+	private BeanRegistrationsAotContribution createContribution(int size, Function<Integer, String> beanNameFactory) {
+		List<Registration> registrations = new ArrayList<>();
+		for (int i = 0; i < size; i++) {
+			String beanName = beanNameFactory.apply(i);
+			RootBeanDefinition beanDefinition = new RootBeanDefinition(TestBean.class);
+			this.beanFactory.registerBeanDefinition(beanName, beanDefinition);
+			RegisteredBean registeredBean = RegisteredBean.of(this.beanFactory, beanName);
+			BeanDefinitionMethodGenerator methodGenerator = new BeanDefinitionMethodGenerator(
+					this.methodGeneratorFactory, registeredBean, null, List.of());
+			registrations.add(new Registration(registeredBean, methodGenerator, new String[0]));
+		}
+		return new BeanRegistrationsAotContribution(registrations);
 	}
 
 	private RegisteredBean registerBean(RootBeanDefinition rootBeanDefinition) {

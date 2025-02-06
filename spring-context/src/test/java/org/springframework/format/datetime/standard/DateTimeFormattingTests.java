@@ -42,6 +42,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledForJreRange;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -52,12 +53,16 @@ import org.springframework.core.convert.ConversionFailedException;
 import org.springframework.core.convert.support.DefaultConversionService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.format.annotation.DateTimeFormat.ISO;
+import org.springframework.format.annotation.DurationFormat;
+import org.springframework.format.annotation.DurationFormat.Style;
 import org.springframework.format.support.FormattingConversionService;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.DataBinder;
 import org.springframework.validation.FieldError;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.condition.JRE.JAVA_19;
+import static org.junit.jupiter.api.condition.JRE.JAVA_20;
 
 /**
  * @author Keith Donald
@@ -67,6 +72,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @author Kazuki Shimizu
  */
 class DateTimeFormattingTests {
+
+	// JDK <= 19 requires a standard space before "AM/PM".
+	// JDK >= 20 requires a NNBSP before "AM/PM".
+	// \u202F is a narrow non-breaking space (NNBSP).
+	private static final String TIME_SEPARATOR = (Runtime.version().feature() < 20 ? " " : "\u202F");
+
 
 	private final FormattingConversionService conversionService = new FormattingConversionService();
 
@@ -210,10 +221,11 @@ class DateTimeFormattingTests {
 	@Test
 	void testBindLocalTime() {
 		MutablePropertyValues propertyValues = new MutablePropertyValues();
-		propertyValues.add("localTime", "12:00 PM");
+		propertyValues.add("localTime", "12:00%sPM".formatted(TIME_SEPARATOR));
 		binder.bind(propertyValues);
 		assertThat(binder.getBindingResult().getErrorCount()).isZero();
-		assertThat(binder.getBindingResult().getFieldValue("localTime")).isEqualTo("12:00 PM");
+		// \p{Zs} matches any Unicode space character
+		assertThat(binder.getBindingResult().getFieldValue("localTime")).asString().matches("12:00\\p{Zs}PM");
 	}
 
 	@Test
@@ -222,7 +234,8 @@ class DateTimeFormattingTests {
 		propertyValues.add("localTime", "12:00:00");
 		binder.bind(propertyValues);
 		assertThat(binder.getBindingResult().getErrorCount()).isZero();
-		assertThat(binder.getBindingResult().getFieldValue("localTime")).isEqualTo("12:00 PM");
+		// \p{Zs} matches any Unicode space character
+		assertThat(binder.getBindingResult().getFieldValue("localTime")).asString().matches("12:00\\p{Zs}PM");
 	}
 
 	@Test
@@ -231,10 +244,11 @@ class DateTimeFormattingTests {
 		registrar.setTimeStyle(FormatStyle.MEDIUM);
 		setup(registrar);
 		MutablePropertyValues propertyValues = new MutablePropertyValues();
-		propertyValues.add("localTime", "12:00:00 PM");
+		propertyValues.add("localTime", "12:00:00%sPM".formatted(TIME_SEPARATOR));
 		binder.bind(propertyValues);
 		assertThat(binder.getBindingResult().getErrorCount()).isZero();
-		assertThat(binder.getBindingResult().getFieldValue("localTime")).isEqualTo("12:00:00 PM");
+		// \p{Zs} matches any Unicode space character
+		assertThat(binder.getBindingResult().getFieldValue("localTime")).asString().matches("12:00:00\\p{Zs}PM");
 	}
 
 	@Test
@@ -252,10 +266,11 @@ class DateTimeFormattingTests {
 	@Test
 	void testBindLocalTimeAnnotated() {
 		MutablePropertyValues propertyValues = new MutablePropertyValues();
-		propertyValues.add("styleLocalTime", "12:00:00 PM");
+		propertyValues.add("styleLocalTime", "12:00:00%sPM".formatted(TIME_SEPARATOR));
 		binder.bind(propertyValues);
 		assertThat(binder.getBindingResult().getErrorCount()).isZero();
-		assertThat(binder.getBindingResult().getFieldValue("styleLocalTime")).isEqualTo("12:00:00 PM");
+		// \p{Zs} matches any Unicode space character
+		assertThat(binder.getBindingResult().getFieldValue("styleLocalTime")).asString().matches("12:00:00\\p{Zs}PM");
 	}
 
 	@Test
@@ -264,7 +279,8 @@ class DateTimeFormattingTests {
 		propertyValues.add("localTime", new GregorianCalendar(1970, 0, 0, 12, 0));
 		binder.bind(propertyValues);
 		assertThat(binder.getBindingResult().getErrorCount()).isZero();
-		assertThat(binder.getBindingResult().getFieldValue("localTime")).isEqualTo("12:00 PM");
+		// \p{Zs} matches any Unicode space character
+		assertThat(binder.getBindingResult().getFieldValue("localTime")).asString().matches("12:00\\p{Zs}PM");
 	}
 
 	@Test
@@ -274,7 +290,8 @@ class DateTimeFormattingTests {
 		binder.bind(propertyValues);
 		assertThat(binder.getBindingResult().getErrorCount()).isZero();
 		String value = binder.getBindingResult().getFieldValue("localDateTime").toString();
-		assertThat(value).startsWith("10/31/09").endsWith("12:00 PM");
+		// \p{Zs} matches any Unicode space character
+		assertThat(value).startsWith("10/31/09").matches(".+?12:00\\p{Zs}PM");
 	}
 
 	@Test
@@ -284,7 +301,8 @@ class DateTimeFormattingTests {
 		binder.bind(propertyValues);
 		assertThat(binder.getBindingResult().getErrorCount()).isZero();
 		String value = binder.getBindingResult().getFieldValue("localDateTime").toString();
-		assertThat(value).startsWith("10/31/09").endsWith("12:00 PM");
+		// \p{Zs} matches any Unicode space character
+		assertThat(value).startsWith("10/31/09").matches(".+?12:00\\p{Zs}PM");
 	}
 
 	@Test
@@ -294,7 +312,8 @@ class DateTimeFormattingTests {
 		binder.bind(propertyValues);
 		assertThat(binder.getBindingResult().getErrorCount()).isZero();
 		String value = binder.getBindingResult().getFieldValue("styleLocalDateTime").toString();
-		assertThat(value).startsWith("Oct 31, 2009").endsWith("12:00:00 PM");
+		// \p{Zs} matches any Unicode space character
+		assertThat(value).startsWith("Oct 31, 2009").matches(".+?12:00:00\\p{Zs}PM");
 	}
 
 	@Test
@@ -304,7 +323,8 @@ class DateTimeFormattingTests {
 		binder.bind(propertyValues);
 		assertThat(binder.getBindingResult().getErrorCount()).isZero();
 		String value = binder.getBindingResult().getFieldValue("localDateTime").toString();
-		assertThat(value).startsWith("10/31/09").endsWith("12:00 PM");
+		// \p{Zs} matches any Unicode space character
+		assertThat(value).startsWith("10/31/09").matches(".+?12:00\\p{Zs}PM");
 	}
 
 	@Test
@@ -317,7 +337,8 @@ class DateTimeFormattingTests {
 		binder.bind(propertyValues);
 		assertThat(binder.getBindingResult().getErrorCount()).isZero();
 		String value = binder.getBindingResult().getFieldValue("localDateTime").toString();
-		assertThat(value).startsWith("Oct 31, 2009").endsWith("12:00:00 PM");
+		// \p{Zs} matches any Unicode space character
+		assertThat(value).startsWith("Oct 31, 2009").matches(".+?12:00:00\\p{Zs}PM");
 	}
 
 	@Test
@@ -466,6 +487,17 @@ class DateTimeFormattingTests {
 	}
 
 	@Test
+	void testBindDurationAnnotated() {
+		MutablePropertyValues propertyValues = new MutablePropertyValues();
+		propertyValues.add("styleDuration", "2ms");
+		binder.bind(propertyValues);
+		assertThat(binder.getBindingResult().getFieldValue("styleDuration"))
+				.isNotNull()
+				.isEqualTo("2000us");
+		assertThat(binder.getBindingResult().getAllErrors()).isEmpty();
+	}
+
+	@Test
 	void testBindYear() {
 		MutablePropertyValues propertyValues = new MutablePropertyValues();
 		propertyValues.add("year", "2007");
@@ -558,18 +590,67 @@ class DateTimeFormattingTests {
 			assertThat(bindingResult.getFieldValue(propertyName)).isEqualTo("2021-03-02");
 		}
 
+		@EnabledForJreRange(max = JAVA_19)
 		@ParameterizedTest(name = "input date: {0}")
-		// @ValueSource(strings = {"12:00:00\u202FPM", "12:00:00", "12:00"})
+		// JDK <= 19 requires a standard space before the "PM".
 		@ValueSource(strings = {"12:00:00 PM", "12:00:00", "12:00"})
-		void styleLocalTime(String propertyValue) {
+		void styleLocalTime_PreJDK20(String propertyValue) {
+			styleLocalTime(propertyValue);
+		}
+
+		@EnabledForJreRange(min = JAVA_20)
+		@ParameterizedTest(name = "input date: {0}")
+		// JDK >= 20 requires a NNBSP before the "PM".
+		// \u202F is a narrow non-breaking space (NNBSP).
+		@ValueSource(strings = {"12:00:00\u202FPM", "12:00:00", "12:00"})
+		void styleLocalTime_PostJDK20(String propertyValue) {
+			styleLocalTime(propertyValue);
+		}
+
+		private void styleLocalTime(String propertyValue) {
 			String propertyName = "styleLocalTimeWithFallbackPatterns";
 			MutablePropertyValues propertyValues = new MutablePropertyValues();
 			propertyValues.add(propertyName, propertyValue);
 			binder.bind(propertyValues);
 			BindingResult bindingResult = binder.getBindingResult();
 			assertThat(bindingResult.getErrorCount()).isZero();
-			// assertThat(bindingResult.getFieldValue(propertyName)).asString().matches("12:00:00\\SPM");
-			assertThat(bindingResult.getFieldValue(propertyName)).isEqualTo("12:00:00 PM");
+			// \p{Zs} matches any Unicode space character
+			assertThat(bindingResult.getFieldValue(propertyName)).asString().matches("12:00:00\\p{Zs}PM");
+		}
+
+		/**
+		 * {@link DateTimeBean#styleLocalTimeWithFallbackPatternsForPreAndPostJdk20}
+		 * configures "-M" as the time style to use. Thus, we have to be aware
+		 * of the following if we do not configure fallback patterns for parsing.
+		 *
+		 * <ul>
+		 * <li>JDK &le; 19 requires a standard space before the "PM".
+		 * <li>JDK &ge; 20 requires a narrow non-breaking space (NNBSP) before the "PM".
+		 * </ul>
+		 *
+		 * <p>To avoid compatibility issues between JDK versions, we have configured
+		 * two fallback patterns which emulate the "-M" style: <code>"HH:mm:ss a"</code>
+		 * matches against a standard space before the "PM", and <code>"HH:mm:ss&#92;u202Fa"</code>
+		 * matches against a narrow non-breaking space (NNBSP) before the "PM".
+		 *
+		 * <p>Thus, the following should theoretically be supported on any JDK (or at least
+		 * JDK 17 - 23, where we have tested it).
+		 */
+		@ParameterizedTest(name = "input date: {0}")  // gh-33151
+		@ValueSource(strings = { "12:00:00 PM", "12:00:00\u202FPM" })
+		void styleLocalTime_PreAndPostJdk20(String propertyValue) {
+			String propertyName = "styleLocalTimeWithFallbackPatternsForPreAndPostJdk20";
+			MutablePropertyValues propertyValues = new MutablePropertyValues();
+			propertyValues.add(propertyName, propertyValue);
+			binder.bind(propertyValues);
+			BindingResult bindingResult = binder.getBindingResult();
+			assertThat(bindingResult.getErrorCount()).isEqualTo(0);
+			String value = binder.getBindingResult().getFieldValue(propertyName).toString();
+			// Since the "-M" style is always used for printing and the underlying format
+			// changes depending on the JDK version, we cannot be certain that a normal
+			// space is used before the "PM". Consequently we have to use a regular
+			// expression to match against any Unicode space character (\p{Zs}).
+			assertThat(value).matches("12:00:00\\p{Zs}PM");
 		}
 
 		@ParameterizedTest(name = "input date: {0}")
@@ -649,6 +730,12 @@ class DateTimeFormattingTests {
 		@DateTimeFormat(style = "-M", fallbackPatterns = {"HH:mm:ss", "HH:mm"})
 		private LocalTime styleLocalTimeWithFallbackPatterns;
 
+		// "-M" style matches either a standard space or a narrow non-breaking space (NNBSP) before AM/PM,
+		// depending on the version of the JDK.
+		// Fallback patterns match a standard space OR a narrow non-breaking space (NNBSP) before AM/PM.
+		@DateTimeFormat(style = "-M", fallbackPatterns = {"HH:mm:ss a", "HH:mm:ss\u202Fa"})
+		private LocalTime styleLocalTimeWithFallbackPatternsForPreAndPostJdk20;
+
 		private LocalDateTime localDateTime;
 
 		@DateTimeFormat(style = "MM")
@@ -677,6 +764,9 @@ class DateTimeFormattingTests {
 		private Period period;
 
 		private Duration duration;
+
+		@DurationFormat(style = Style.SIMPLE, defaultUnit = DurationFormat.Unit.MICROS)
+		private Duration styleDuration;
 
 		private Year year;
 
@@ -747,6 +837,15 @@ class DateTimeFormattingTests {
 
 		public void setStyleLocalTimeWithFallbackPatterns(LocalTime styleLocalTimeWithFallbackPatterns) {
 			this.styleLocalTimeWithFallbackPatterns = styleLocalTimeWithFallbackPatterns;
+		}
+
+		public LocalTime getStyleLocalTimeWithFallbackPatternsForPreAndPostJdk20() {
+			return this.styleLocalTimeWithFallbackPatternsForPreAndPostJdk20;
+		}
+
+		public void setStyleLocalTimeWithFallbackPatternsForPreAndPostJdk20(
+				LocalTime styleLocalTimeWithFallbackPatternsForPreAndPostJdk20) {
+			this.styleLocalTimeWithFallbackPatternsForPreAndPostJdk20 = styleLocalTimeWithFallbackPatternsForPreAndPostJdk20;
 		}
 
 		public LocalDateTime getLocalDateTime() {
@@ -835,6 +934,14 @@ class DateTimeFormattingTests {
 
 		public void setDuration(Duration duration) {
 			this.duration = duration;
+		}
+
+		public Duration getStyleDuration() {
+			return this.styleDuration;
+		}
+
+		public void setStyleDuration(Duration styleDuration) {
+			this.styleDuration = styleDuration;
 		}
 
 		public Year getYear() {

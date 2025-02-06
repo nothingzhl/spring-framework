@@ -35,6 +35,7 @@ import freemarker.template.SimpleHash;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
 import freemarker.template.Version;
+import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
@@ -46,7 +47,6 @@ import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.core.io.buffer.DataBufferUtils;
 import org.springframework.http.MediaType;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.FastByteArrayOutputStream;
 import org.springframework.util.MimeType;
@@ -90,7 +90,7 @@ import org.springframework.web.server.ServerWebExchange;
  * sets the supported media type to {@code "text/html;charset=UTF-8"} by default.
  * Thus, those default values are likely suitable for most applications.
  *
- * <p>Note: Spring's FreeMarker support requires FreeMarker 2.3.26 or higher.
+ * <p>Note: Spring's FreeMarker support requires FreeMarker 2.3.33 or higher.
  *
  * @author Rossen Stoyanchev
  * @author Sam Brannen
@@ -109,11 +109,9 @@ public class FreeMarkerView extends AbstractUrlBasedView {
 	public static final String SPRING_MACRO_REQUEST_CONTEXT_ATTRIBUTE = "springMacroRequestContext";
 
 
-	@Nullable
-	private Configuration configuration;
+	private @Nullable Configuration configuration;
 
-	@Nullable
-	private String encoding;
+	private @Nullable String encoding;
 
 	private boolean exposeSpringMacroHelpers = true;
 
@@ -131,8 +129,7 @@ public class FreeMarkerView extends AbstractUrlBasedView {
 	/**
 	 * Get the FreeMarker {@link Configuration} used by this view.
 	 */
-	@Nullable
-	protected Configuration getConfiguration() {
+	protected @Nullable Configuration getConfiguration() {
 		return this.configuration;
 	}
 
@@ -193,8 +190,7 @@ public class FreeMarkerView extends AbstractUrlBasedView {
 	 * determine the encoding.
 	 * @see #setEncoding(String)
 	 */
-	@Nullable
-	protected String getEncoding() {
+	protected @Nullable String getEncoding() {
 		return this.encoding;
 	}
 
@@ -248,24 +244,9 @@ public class FreeMarkerView extends AbstractUrlBasedView {
 	 * multiple templates to be rendered into a single view.
 	 */
 	@Override
-	public boolean checkResourceExists(Locale locale) throws Exception {
-		try {
-			// Check that we can get the template, even if we might subsequently get it again.
-			getTemplate(locale);
-			return true;
-		}
-		catch (FileNotFoundException ex) {
-			// Allow for ViewResolver chaining...
-			return false;
-		}
-		catch (ParseException ex) {
-			throw new ApplicationContextException(
-					"Failed to parse FreeMarker template for URL [" + getUrl() + "]", ex);
-		}
-		catch (IOException ex) {
-			throw new ApplicationContextException(
-					"Could not load FreeMarker template for URL [" + getUrl() + "]", ex);
-		}
+	public boolean checkResourceExists(Locale locale) {
+		throw new UnsupportedOperationException(
+				"This should never be called as we override resourceExists returning Mono<Boolean>");
 	}
 
 	/**
@@ -376,23 +357,6 @@ public class FreeMarkerView extends AbstractUrlBasedView {
 		ObjectWrapper ow = obtainConfiguration().getObjectWrapper();
 		Version version = Configuration.DEFAULT_INCOMPATIBLE_IMPROVEMENTS;
 		return (ow != null ? ow : new DefaultObjectWrapperBuilder(version).build());
-	}
-
-	/**
-	 * Retrieve the FreeMarker {@link Template} to be rendered by this view, for
-	 * the specified locale and using the {@linkplain #setEncoding(String) configured
-	 * encoding} if set.
-	 * <p>By default, the template specified by the "url" bean property will be retrieved.
-	 * @param locale the current locale
-	 * @return the FreeMarker template to render
-	 * @deprecated since 6.1, in favor of {@link #lookupTemplate(Locale)}, to be
-	 * removed in 6.2
-	 */
-	@Deprecated(since = "6.1", forRemoval = true)
-	protected Template getTemplate(Locale locale) throws IOException {
-		return (getEncoding() != null ?
-				obtainConfiguration().getTemplate(getUrl(), locale, getEncoding()) :
-				obtainConfiguration().getTemplate(getUrl(), locale));
 	}
 
 	/**

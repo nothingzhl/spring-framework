@@ -37,6 +37,7 @@ import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.assertj.core.api.InstanceOfAssertFactories;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.core.MethodParameter;
@@ -61,7 +62,6 @@ import org.springframework.expression.spel.support.ReflectivePropertyAccessor;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
 import org.springframework.expression.spel.support.StandardTypeLocator;
 import org.springframework.expression.spel.testresources.le.div.mod.reserved.Reserver;
-import org.springframework.lang.Nullable;
 import org.springframework.util.ObjectUtils;
 import org.springframework.util.ReflectionUtils;
 
@@ -69,6 +69,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatException;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
+import static org.assertj.core.api.InstanceOfAssertFactories.list;
 
 /**
  * Reproduction tests cornering various reported SpEL issues.
@@ -1168,7 +1169,6 @@ class SpelReproTests extends AbstractExpressionTests {
 		TypedValue value = accessor.read(context, target, "property");
 		assertThat(value.getValue()).isEqualTo(1);
 		assertThat(value.getTypeDescriptor().getType()).isEqualTo(Integer.class);
-		assertThat(value.getTypeDescriptor().getAnnotations()).isNotEmpty();
 	}
 
 	@Test
@@ -1436,13 +1436,20 @@ class SpelReproTests extends AbstractExpressionTests {
 		assertThat(expression.getValue(new NamedUser())).isEqualTo(NamedUser.class.getName());
 	}
 
-	@Test
-	void SPR12522() {
+	@Test  // gh-17127, SPR-12522
+	void arraysAsListWithNoArguments() {
+		SpelExpressionParser parser = new SpelExpressionParser();
+		Expression expression = parser.parseExpression("T(java.util.Arrays).asList()");
+		List<?> value = expression.getValue(List.class);
+		assertThat(value).isEmpty();
+	}
+
+	@Test  // gh-33013
+	void arraysAsListWithSingleEmptyStringArgument() {
 		SpelExpressionParser parser = new SpelExpressionParser();
 		Expression expression = parser.parseExpression("T(java.util.Arrays).asList('')");
-		Object value = expression.getValue();
-		assertThat(value).isInstanceOf(List.class);
-		assertThat(((List<?>) value)).isEmpty();
+		List<?> value = expression.getValue(List.class);
+		assertThat(value).asInstanceOf(list(String.class)).containsExactly("");
 	}
 
 	@Test
@@ -2150,8 +2157,7 @@ class SpelReproTests extends AbstractExpressionTests {
 		}
 
 		@Override
-		@Nullable
-		public Integer getProperty() {
+		public @Nullable Integer getProperty() {
 			return this.value;
 		}
 	}

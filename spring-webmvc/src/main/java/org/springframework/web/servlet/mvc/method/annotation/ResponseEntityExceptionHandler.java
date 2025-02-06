@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ package org.springframework.web.servlet.mvc.method.annotation;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.beans.ConversionNotSupportedException;
 import org.springframework.beans.TypeMismatchException;
@@ -32,8 +33,6 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.http.converter.HttpMessageNotWritableException;
-import org.springframework.lang.Nullable;
-import org.springframework.validation.BindException;
 import org.springframework.validation.method.MethodValidationException;
 import org.springframework.web.ErrorResponse;
 import org.springframework.web.ErrorResponseException;
@@ -48,6 +47,7 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.context.request.async.AsyncRequestTimeoutException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -91,8 +91,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	protected final Log logger = LogFactory.getLog(getClass());
 
 
-	@Nullable
-	private MessageSource messageSource;
+	private @Nullable MessageSource messageSource;
 
 
 	@Override
@@ -104,8 +103,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * Get the {@link MessageSource} that this exception handler uses.
 	 * @since 6.0.3
 	 */
-	@Nullable
-	protected MessageSource getMessageSource() {
+	protected @Nullable MessageSource getMessageSource() {
 		return this.messageSource;
 	}
 
@@ -135,10 +133,9 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 			HttpMessageNotReadableException.class,
 			HttpMessageNotWritableException.class,
 			MethodValidationException.class,
-			BindException.class
+			AsyncRequestNotUsableException.class
 		})
-	@Nullable
-	public final ResponseEntity<Object> handleException(Exception ex, WebRequest request) throws Exception {
+	public final @Nullable ResponseEntity<Object> handleException(Exception ex, WebRequest request) throws Exception {
 		if (ex instanceof HttpRequestMethodNotSupportedException subEx) {
 			return handleHttpRequestMethodNotSupported(subEx, subEx.getHeaders(), subEx.getStatusCode(), request);
 		}
@@ -197,8 +194,11 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 		else if (ex instanceof HttpMessageNotWritableException theEx) {
 			return handleHttpMessageNotWritable(theEx, headers, HttpStatus.INTERNAL_SERVER_ERROR, request);
 		}
-		else if (ex instanceof MethodValidationException subEx) {
-			return handleMethodValidationException(subEx, headers, HttpStatus.INTERNAL_SERVER_ERROR, request);
+		else if (ex instanceof MethodValidationException theEx) {
+			return handleMethodValidationException(theEx, headers, HttpStatus.INTERNAL_SERVER_ERROR, request);
+		}
+		else if (ex instanceof AsyncRequestNotUsableException theEx) {
+			return handleAsyncRequestNotUsableException(theEx, request);
 		}
 		else {
 			// Unknown exception, typically a wrapper with a common MVC exception as cause
@@ -219,8 +219,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * @return a {@code ResponseEntity} for the response to use, possibly
 	 * {@code null} when the response is already committed
 	 */
-	@Nullable
-	protected ResponseEntity<Object> handleHttpRequestMethodNotSupported(
+	protected @Nullable ResponseEntity<Object> handleHttpRequestMethodNotSupported(
 			HttpRequestMethodNotSupportedException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
 
 		pageNotFoundLogger.warn(ex.getMessage());
@@ -237,8 +236,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * @return a {@code ResponseEntity} for the response to use, possibly
 	 * {@code null} when the response is already committed
 	 */
-	@Nullable
-	protected ResponseEntity<Object> handleHttpMediaTypeNotSupported(
+	protected @Nullable ResponseEntity<Object> handleHttpMediaTypeNotSupported(
 			HttpMediaTypeNotSupportedException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
 
 		return handleExceptionInternal(ex, null, headers, status, request);
@@ -254,8 +252,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * @return a {@code ResponseEntity} for the response to use, possibly
 	 * {@code null} when the response is already committed
 	 */
-	@Nullable
-	protected ResponseEntity<Object> handleHttpMediaTypeNotAcceptable(
+	protected @Nullable ResponseEntity<Object> handleHttpMediaTypeNotAcceptable(
 			HttpMediaTypeNotAcceptableException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
 
 		return handleExceptionInternal(ex, null, headers, status, request);
@@ -272,8 +269,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * {@code null} when the response is already committed
 	 * @since 4.2
 	 */
-	@Nullable
-	protected ResponseEntity<Object> handleMissingPathVariable(
+	protected @Nullable ResponseEntity<Object> handleMissingPathVariable(
 			MissingPathVariableException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
 
 		return handleExceptionInternal(ex, null, headers, status, request);
@@ -289,8 +285,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * @return a {@code ResponseEntity} for the response to use, possibly
 	 * {@code null} when the response is already committed
 	 */
-	@Nullable
-	protected ResponseEntity<Object> handleMissingServletRequestParameter(
+	protected @Nullable ResponseEntity<Object> handleMissingServletRequestParameter(
 			MissingServletRequestParameterException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
 
 		return handleExceptionInternal(ex, null, headers, status, request);
@@ -306,8 +301,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * @return a {@code ResponseEntity} for the response to use, possibly
 	 * {@code null} when the response is already committed
 	 */
-	@Nullable
-	protected ResponseEntity<Object> handleMissingServletRequestPart(
+	protected @Nullable ResponseEntity<Object> handleMissingServletRequestPart(
 			MissingServletRequestPartException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
 
 		return handleExceptionInternal(ex, null, headers, status, request);
@@ -323,8 +317,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * @return a {@code ResponseEntity} for the response to use, possibly
 	 * {@code null} when the response is already committed
 	 */
-	@Nullable
-	protected ResponseEntity<Object> handleServletRequestBindingException(
+	protected @Nullable ResponseEntity<Object> handleServletRequestBindingException(
 			ServletRequestBindingException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
 
 		return handleExceptionInternal(ex, null, headers, status, request);
@@ -340,8 +333,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * @return a {@code ResponseEntity} for the response to use, possibly
 	 * {@code null} when the response is already committed
 	 */
-	@Nullable
-	protected ResponseEntity<Object> handleMethodArgumentNotValid(
+	protected @Nullable ResponseEntity<Object> handleMethodArgumentNotValid(
 			MethodArgumentNotValidException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
 
 		return handleExceptionInternal(ex, null, headers, status, request);
@@ -358,8 +350,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * {@code null} when the response is already committed
 	 * @since 6.1
 	 */
-	@Nullable
-	protected ResponseEntity<Object> handleHandlerMethodValidationException(
+	protected @Nullable ResponseEntity<Object> handleHandlerMethodValidationException(
 			HandlerMethodValidationException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
 
 		return handleExceptionInternal(ex, null, headers, status, request);
@@ -376,8 +367,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * {@code null} when the response is already committed
 	 * @since 4.0
 	 */
-	@Nullable
-	protected ResponseEntity<Object> handleNoHandlerFoundException(
+	protected @Nullable ResponseEntity<Object> handleNoHandlerFoundException(
 			NoHandlerFoundException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
 
 		return handleExceptionInternal(ex, null, headers, status, request);
@@ -394,8 +384,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * {@code null} when the response is already committed
 	 * @since 6.1
 	 */
-	@Nullable
-	protected ResponseEntity<Object> handleNoResourceFoundException(
+	protected @Nullable ResponseEntity<Object> handleNoResourceFoundException(
 			NoResourceFoundException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
 
 		return handleExceptionInternal(ex, null, headers, status, request);
@@ -412,8 +401,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * {@code null} when the response is already committed
 	 * @since 4.2.8
 	 */
-	@Nullable
-	protected ResponseEntity<Object> handleAsyncRequestTimeoutException(
+	protected @Nullable ResponseEntity<Object> handleAsyncRequestTimeoutException(
 			AsyncRequestTimeoutException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
 
 		return handleExceptionInternal(ex, null, headers, status, request);
@@ -430,8 +418,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * {@code null} when the response is already committed
 	 * @since 6.0
 	 */
-	@Nullable
-	protected ResponseEntity<Object> handleErrorResponseException(
+	protected @Nullable ResponseEntity<Object> handleErrorResponseException(
 			ErrorResponseException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
 
 		return handleExceptionInternal(ex, null, headers, status, request);
@@ -448,8 +435,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * {@code null} when the response is already committed
 	 * @since 6.1
 	 */
-	@Nullable
-	protected ResponseEntity<Object> handleMaxUploadSizeExceededException(
+	protected @Nullable ResponseEntity<Object> handleMaxUploadSizeExceededException(
 			MaxUploadSizeExceededException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
 
 		return handleExceptionInternal(ex, null, headers, status, request);
@@ -468,8 +454,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * @return a {@code ResponseEntity} for the response to use, possibly
 	 * {@code null} when the response is already committed
 	 */
-	@Nullable
-	protected ResponseEntity<Object> handleConversionNotSupported(
+	protected @Nullable ResponseEntity<Object> handleConversionNotSupported(
 			ConversionNotSupportedException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
 
 		Object[] args = {ex.getPropertyName(), ex.getValue()};
@@ -492,8 +477,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * @return a {@code ResponseEntity} for the response to use, possibly
 	 * {@code null} when the response is already committed
 	 */
-	@Nullable
-	protected ResponseEntity<Object> handleTypeMismatch(
+	protected @Nullable ResponseEntity<Object> handleTypeMismatch(
 			TypeMismatchException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
 
 		Object[] args = {ex.getPropertyName(), ex.getValue()};
@@ -517,8 +501,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * @return a {@code ResponseEntity} for the response to use, possibly
 	 * {@code null} when the response is already committed
 	 */
-	@Nullable
-	protected ResponseEntity<Object> handleHttpMessageNotReadable(
+	protected @Nullable ResponseEntity<Object> handleHttpMessageNotReadable(
 			HttpMessageNotReadableException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
 
 		ProblemDetail body = createProblemDetail(ex, status, "Failed to read request", null, null, request);
@@ -538,8 +521,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * @return a {@code ResponseEntity} for the response to use, possibly
 	 * {@code null} when the response is already committed
 	 */
-	@Nullable
-	protected ResponseEntity<Object> handleHttpMessageNotWritable(
+	protected @Nullable ResponseEntity<Object> handleHttpMessageNotWritable(
 			HttpMessageNotWritableException ex, HttpHeaders headers, HttpStatusCode status, WebRequest request) {
 
 		ProblemDetail body = createProblemDetail(ex, status, "Failed to write request", null, null, request);
@@ -560,12 +542,26 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * {@code null} when the response is already committed
 	 * @since 6.1
 	 */
-	@Nullable
-	protected ResponseEntity<Object> handleMethodValidationException(
+	protected @Nullable ResponseEntity<Object> handleMethodValidationException(
 			MethodValidationException ex, HttpHeaders headers, HttpStatus status, WebRequest request) {
 
 		ProblemDetail body = createProblemDetail(ex, status, "Validation failed", null, null, request);
 		return handleExceptionInternal(ex, body, headers, status, request);
+	}
+
+	/**
+	 * Customize the handling of {@link AsyncRequestNotUsableException}.
+	 * <p>By default, return {@code null} since the response is not usable.
+	 * @param ex the exception to handle
+	 * @param request the current request
+	 * @return a {@code ResponseEntity} for the response to use, possibly
+	 * {@code null} when the response is already committed
+	 * @since 6.2
+	 */
+	protected @Nullable ResponseEntity<Object> handleAsyncRequestNotUsableException(
+			AsyncRequestNotUsableException ex, WebRequest request) {
+
+		return null;
 	}
 
 	/**
@@ -586,7 +582,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 */
 	protected ProblemDetail createProblemDetail(
 			Exception ex, HttpStatusCode status, String defaultDetail, @Nullable String detailMessageCode,
-			@Nullable Object[] detailMessageArguments, WebRequest request) {
+			Object @Nullable [] detailMessageArguments, WebRequest request) {
 
 		ErrorResponse.Builder builder = ErrorResponse.builder(ex, status, defaultDetail);
 		if (detailMessageCode != null) {
@@ -617,8 +613,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	 * @return a {@code ResponseEntity} for the response to use, possibly
 	 * {@code null} when the response is already committed
 	 */
-	@Nullable
-	protected ResponseEntity<Object> handleExceptionInternal(
+	protected @Nullable ResponseEntity<Object> handleExceptionInternal(
 			Exception ex, @Nullable Object body, HttpHeaders headers, HttpStatusCode statusCode, WebRequest request) {
 
 		if (request instanceof ServletWebRequest servletWebRequest) {
@@ -645,7 +640,7 @@ public abstract class ResponseEntityExceptionHandler implements MessageSourceAwa
 	/**
 	 * Create the {@link ResponseEntity} to use from the given body, headers,
 	 * and statusCode. Subclasses can override this method to inspect and possibly
-	 * modify the body, headers, or statusCode, e.g. to re-create an instance of
+	 * modify the body, headers, or statusCode, for example, to re-create an instance of
 	 * {@link ProblemDetail} as an extension of {@link ProblemDetail}.
 	 * @param body the body to use for the response
 	 * @param headers the headers to use for the response

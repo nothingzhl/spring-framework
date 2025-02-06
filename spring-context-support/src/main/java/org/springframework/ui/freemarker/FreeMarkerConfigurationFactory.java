@@ -33,12 +33,12 @@ import freemarker.template.SimpleHash;
 import freemarker.template.TemplateException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.core.io.support.PropertiesLoaderUtils;
-import org.springframework.lang.Nullable;
 import org.springframework.util.CollectionUtils;
 
 /**
@@ -62,7 +62,7 @@ import org.springframework.util.CollectionUtils;
  * <p>The simplest way to use this class is to specify a "templateLoaderPath";
  * FreeMarker does not need any further configuration then.
  *
- * <p>Note: Spring's FreeMarker support requires FreeMarker 2.3.26 or higher.
+ * <p>Note: Spring's FreeMarker support requires FreeMarker 2.3.33 or higher.
  *
  * @author Darren Davison
  * @author Juergen Hoeller
@@ -81,28 +81,21 @@ public class FreeMarkerConfigurationFactory {
 
 	protected final Log logger = LogFactory.getLog(getClass());
 
-	@Nullable
-	private Resource configLocation;
+	private @Nullable Resource configLocation;
 
-	@Nullable
-	private Properties freemarkerSettings;
+	private @Nullable Properties freemarkerSettings;
 
-	@Nullable
-	private Map<String, Object> freemarkerVariables;
+	private @Nullable Map<String, Object> freemarkerVariables;
 
-	@Nullable
-	private String defaultEncoding;
+	private @Nullable String defaultEncoding;
 
 	private final List<TemplateLoader> templateLoaders = new ArrayList<>();
 
-	@Nullable
-	private List<TemplateLoader> preTemplateLoaders;
+	private @Nullable List<TemplateLoader> preTemplateLoaders;
 
-	@Nullable
-	private List<TemplateLoader> postTemplateLoaders;
+	private @Nullable List<TemplateLoader> postTemplateLoaders;
 
-	@Nullable
-	private String[] templateLoaderPaths;
+	private String @Nullable [] templateLoaderPaths;
 
 	private ResourceLoader resourceLoader = new DefaultResourceLoader();
 
@@ -147,7 +140,7 @@ public class FreeMarkerConfigurationFactory {
 	 * <p>Note that the supplied encoding may or may not be used for template
 	 * rendering. See the documentation for Spring's {@code FreeMarkerView} and
 	 * {@code FreeMarkerViewResolver} implementations for further details.
-	 * @see #setDefaultEncoding(Charset)
+	 * @see #setDefaultCharset(Charset)
 	 * @see freemarker.template.Configuration#setDefaultEncoding
 	 * @see org.springframework.web.servlet.view.freemarker.FreeMarkerView#setEncoding
 	 * @see org.springframework.web.servlet.view.freemarker.FreeMarkerView#setContentType
@@ -418,8 +411,7 @@ public class FreeMarkerConfigurationFactory {
 	 * @param templateLoaders the final List of {@code TemplateLoader} instances
 	 * @return the aggregate TemplateLoader
 	 */
-	@Nullable
-	protected TemplateLoader getAggregateTemplateLoader(List<TemplateLoader> templateLoaders) {
+	protected @Nullable TemplateLoader getAggregateTemplateLoader(List<TemplateLoader> templateLoaders) {
 		return switch (templateLoaders.size()) {
 			case 0 -> {
 				logger.debug("No FreeMarker TemplateLoaders specified");

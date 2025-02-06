@@ -21,10 +21,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.function.Predicate;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.context.MessageSource;
+import org.springframework.context.MessageSourceResolvable;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpStatus;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.validation.method.MethodValidationResult;
 import org.springframework.validation.method.ParameterErrors;
@@ -107,8 +109,13 @@ public class HandlerMethodValidationException extends ResponseStatusException im
 	}
 
 	@Override
-	public List<ParameterValidationResult> getAllValidationResults() {
-		return this.validationResult.getAllValidationResults();
+	public List<ParameterValidationResult> getParameterValidationResults() {
+		return this.validationResult.getParameterValidationResults();
+	}
+
+	@Override
+	public List<MessageSourceResolvable> getCrossParameterValidationResults() {
+		return this.validationResult.getCrossParameterValidationResults();
 	}
 
 	/**
@@ -116,7 +123,7 @@ public class HandlerMethodValidationException extends ResponseStatusException im
 	 * through callback methods organized by controller method parameter type.
 	 */
 	public void visitResults(Visitor visitor) {
-		for (ParameterValidationResult result : getAllValidationResults()) {
+		for (ParameterValidationResult result : getParameterValidationResults()) {
 			MethodParameter param = result.getMethodParameter();
 			CookieValue cookieValue = param.getParameterAnnotation(CookieValue.class);
 			if (cookieValue != null) {

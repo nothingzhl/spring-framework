@@ -22,7 +22,8 @@ import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.function.IntPredicate;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.util.Assert;
 import org.springframework.util.ObjectUtils;
 
@@ -355,7 +356,7 @@ public class DefaultDataBuffer implements DataBuffer {
 	}
 
 	@Override
-	public DataBuffer split(int index) {
+	public DefaultDataBuffer split(int index) {
 		checkIndex(index);
 
 		ByteBuffer split = this.byteBuffer.duplicate().clear()

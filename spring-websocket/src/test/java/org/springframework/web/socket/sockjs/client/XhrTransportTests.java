@@ -69,7 +69,7 @@ class XhrTransportTests {
 		transport.sendMessageResponseToReturn = new ResponseEntity<>(HttpStatus.NO_CONTENT);
 		URI url = URI.create("https://example.com");
 		transport.executeSendRequest(url, requestHeaders, new TextMessage("payload"));
-		assertThat(transport.actualSendRequestHeaders).hasSize(2);
+		assertThat(transport.actualSendRequestHeaders.size()).isEqualTo(2);
 		assertThat(transport.actualSendRequestHeaders.getFirst("foo")).isEqualTo("bar");
 		assertThat(transport.actualSendRequestHeaders.getContentType()).isEqualTo(MediaType.APPLICATION_JSON);
 	}
@@ -84,7 +84,6 @@ class XhrTransportTests {
 	}
 
 	@Test
-	@SuppressWarnings("deprecation")
 	void connect() {
 		HttpHeaders handshakeHeaders = new HttpHeaders();
 		handshakeHeaders.setOrigin("foo");
@@ -96,7 +95,7 @@ class XhrTransportTests {
 
 		TestXhrTransport transport = new TestXhrTransport();
 		WebSocketHandler handler = mock();
-		transport.connect(request, handler);
+		transport.connectAsync(request, handler);
 
 		ArgumentCaptor<Runnable> captor = ArgumentCaptor.forClass(Runnable.class);
 		verify(request).getSockJsUrlInfo();
@@ -106,7 +105,7 @@ class XhrTransportTests {
 		verify(request).getHttpRequestHeaders();
 		verifyNoMoreInteractions(request);
 
-		assertThat(transport.actualHandshakeHeaders).hasSize(1);
+		assertThat(transport.actualHandshakeHeaders.size()).isOne();
 		assertThat(transport.actualHandshakeHeaders.getOrigin()).isEqualTo("foo");
 
 		assertThat(transport.actualSession.isDisconnected()).isFalse();
@@ -126,7 +125,6 @@ class XhrTransportTests {
 		private HttpHeaders actualHandshakeHeaders;
 
 		private XhrClientSockJsSession actualSession;
-
 
 		@Override
 		protected ResponseEntity<String> executeInfoRequestInternal(URI infoUrl, HttpHeaders headers) {

@@ -33,7 +33,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.util.Assert;
 
 /**
@@ -55,7 +56,9 @@ import org.springframework.util.Assert;
  * @see java.nio.file.Path
  * @see java.nio.file.Files
  * @see FileSystemResource
+ * @deprecated since 7.0 in favor of {@link FileSystemResource}
  */
+@Deprecated(since = "7.0", forRemoval = true)
 public class PathResource extends AbstractResource implements WritableResource {
 
 	private final Path path;
@@ -65,7 +68,7 @@ public class PathResource extends AbstractResource implements WritableResource {
 	 * Create a new {@code PathResource} from a {@link Path} handle.
 	 * <p>Note: Unlike {@link FileSystemResource}, when building relative resources
 	 * via {@link #createRelative}, the relative path will be built <i>underneath</i>
-	 * the given root: e.g. Paths.get("C:/dir1/"), relative path "dir2" &rarr; "C:/dir1/dir2"!
+	 * the given root: for example, Paths.get("C:/dir1/"), relative path "dir2" &rarr; "C:/dir1/dir2"!
 	 * @param path a Path handle
 	 */
 	public PathResource(Path path) {
@@ -77,7 +80,7 @@ public class PathResource extends AbstractResource implements WritableResource {
 	 * Create a new {@code PathResource} from a path string.
 	 * <p>Note: Unlike {@link FileSystemResource}, when building relative resources
 	 * via {@link #createRelative}, the relative path will be built <i>underneath</i>
-	 * the given root: e.g. Paths.get("C:/dir1/"), relative path "dir2" &rarr; "C:/dir1/dir2"!
+	 * the given root: for example, Paths.get("C:/dir1/"), relative path "dir2" &rarr; "C:/dir1/dir2"!
 	 * @param path a path
 	 * @see java.nio.file.Paths#get(String, String...)
 	 */
@@ -90,7 +93,7 @@ public class PathResource extends AbstractResource implements WritableResource {
 	 * Create a new {@code PathResource} from a {@link URI}.
 	 * <p>Note: Unlike {@link FileSystemResource}, when building relative resources
 	 * via {@link #createRelative}, the relative path will be built <i>underneath</i>
-	 * the given root: e.g. Paths.get("C:/dir1/"), relative path "dir2" &rarr; "C:/dir1/dir2"!
+	 * the given root: for example, Paths.get("C:/dir1/"), relative path "dir2" &rarr; "C:/dir1/dir2"!
 	 * @param uri a path URI
 	 * @see java.nio.file.Paths#get(URI)
 	 */

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -54,8 +54,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
-import static org.junit.jupiter.api.Named.named;
-import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.junit.jupiter.params.provider.Arguments.argumentSet;
 
 /**
  * Tests for various {@link Resource} implementations.
@@ -67,7 +66,7 @@ import static org.junit.jupiter.params.provider.Arguments.arguments;
  */
 class ResourceTests {
 
-	@ParameterizedTest(name = "{index}: {0}")
+	@ParameterizedTest
 	@MethodSource("resource")
 	void resourceIsValid(Resource resource) throws Exception {
 		assertThat(resource.getFilename()).isEqualTo("ResourceTests.class");
@@ -79,7 +78,7 @@ class ResourceTests {
 		assertThat(resource.getContentAsByteArray()).containsExactly(Files.readAllBytes(Path.of(resource.getURI())));
 	}
 
-	@ParameterizedTest(name = "{index}: {0}")
+	@ParameterizedTest
 	@MethodSource("resource")
 	void resourceCreateRelative(Resource resource) throws Exception {
 		Resource relative1 = resource.createRelative("ClassPathResourceTests.class");
@@ -91,7 +90,7 @@ class ResourceTests {
 		assertThat(relative1.lastModified()).isGreaterThan(0);
 	}
 
-	@ParameterizedTest(name = "{index}: {0}")
+	@ParameterizedTest
 	@MethodSource("resource")
 	void resourceCreateRelativeWithFolder(Resource resource) throws Exception {
 		Resource relative2 = resource.createRelative("support/PathMatchingResourcePatternResolverTests.class");
@@ -103,7 +102,7 @@ class ResourceTests {
 		assertThat(relative2.lastModified()).isGreaterThan(0);
 	}
 
-	@ParameterizedTest(name = "{index}: {0}")
+	@ParameterizedTest
 	@MethodSource("resource")
 	void resourceCreateRelativeWithDotPath(Resource resource) throws Exception {
 		Resource relative3 = resource.createRelative("../CollectionFactoryTests.class");
@@ -115,7 +114,7 @@ class ResourceTests {
 		assertThat(relative3.lastModified()).isGreaterThan(0);
 	}
 
-	@ParameterizedTest(name = "{index}: {0}")
+	@ParameterizedTest
 	@MethodSource("resource")
 	void resourceCreateRelativeUnknown(Resource resource) throws Exception {
 		Resource relative4 = resource.createRelative("X.class");
@@ -133,13 +132,13 @@ class ResourceTests {
 		URL resourceClass = ResourceTests.class.getResource("ResourceTests.class");
 		Path resourceClassFilePath = Paths.get(resourceClass.toURI());
 		return Stream.of(
-				arguments(named("ClassPathResource", new ClassPathResource("org/springframework/core/io/ResourceTests.class"))),
-				arguments(named("ClassPathResource with ClassLoader", new ClassPathResource("org/springframework/core/io/ResourceTests.class", ResourceTests.class.getClassLoader()))),
-				arguments(named("ClassPathResource with Class", new ClassPathResource("ResourceTests.class", ResourceTests.class))),
-				arguments(named("FileSystemResource", new FileSystemResource(resourceClass.getFile()))),
-				arguments(named("FileSystemResource with File", new FileSystemResource(new File(resourceClass.getFile())))),
-				arguments(named("FileSystemResource with File path", new FileSystemResource(resourceClassFilePath))),
-				arguments(named("UrlResource", new UrlResource(resourceClass)))
+				argumentSet("ClassPathResource", new ClassPathResource("org/springframework/core/io/ResourceTests.class")),
+				argumentSet("ClassPathResource with ClassLoader", new ClassPathResource("org/springframework/core/io/ResourceTests.class", ResourceTests.class.getClassLoader())),
+				argumentSet("ClassPathResource with Class", new ClassPathResource("ResourceTests.class", ResourceTests.class)),
+				argumentSet("FileSystemResource", new FileSystemResource(resourceClass.getFile())),
+				argumentSet("FileSystemResource with File", new FileSystemResource(new File(resourceClass.getFile()))),
+				argumentSet("FileSystemResource with File path", new FileSystemResource(resourceClassFilePath)),
+				argumentSet("UrlResource", new UrlResource(resourceClass))
 		);
 	}
 
@@ -307,7 +306,9 @@ class ResourceTests {
 	@Nested
 	class UrlResourceTests {
 
-		private MockWebServer server = new MockWebServer();
+		private static final String LAST_MODIFIED = "Wed, 09 Apr 2014 09:57:42 GMT";
+
+		private final MockWebServer server = new MockWebServer();
 
 		@Test
 		void sameResourceWithRelativePathIsEqual() throws Exception {
@@ -378,23 +379,52 @@ class ResourceTests {
 		}
 
 		@Test
+		void unusualRelativeResourcesAreEqual() throws Exception {
+			Resource resource = new UrlResource("file:dir/");
+			Resource relative = resource.createRelative("https://spring.io");
+			assertThat(relative).isEqualTo(new UrlResource("file:dir/https://spring.io"));
+		}
+
+		@Test
 		void missingRemoteResourceDoesNotExist() throws Exception {
-			String baseUrl = startServer();
+			String baseUrl = startServer(true);
 			UrlResource resource = new UrlResource(baseUrl + "/missing");
 			assertThat(resource.exists()).isFalse();
 		}
 
 		@Test
 		void remoteResourceExists() throws Exception {
-			String baseUrl = startServer();
+			String baseUrl = startServer(true);
 			UrlResource resource = new UrlResource(baseUrl + "/resource");
 			assertThat(resource.exists()).isTrue();
+			assertThat(resource.isReadable()).isTrue();
 			assertThat(resource.contentLength()).isEqualTo(6);
+			assertThat(resource.lastModified()).isGreaterThan(0);
+		}
+
+		@Test
+		void remoteResourceExistsFallback() throws Exception {
+			String baseUrl = startServer(false);
+			UrlResource resource = new UrlResource(baseUrl + "/resource");
+			assertThat(resource.exists()).isTrue();
+			assertThat(resource.isReadable()).isTrue();
+			assertThat(resource.contentLength()).isEqualTo(6);
+			assertThat(resource.lastModified()).isGreaterThan(0);
 		}
 
 		@Test
 		void canCustomizeHttpUrlConnectionForExists() throws Exception {
-			String baseUrl = startServer();
+			String baseUrl = startServer(true);
+			CustomResource resource = new CustomResource(baseUrl + "/resource");
+			assertThat(resource.exists()).isTrue();
+			RecordedRequest request = this.server.takeRequest();
+			assertThat(request.getMethod()).isEqualTo("HEAD");
+			assertThat(request.getHeader("Framework-Name")).isEqualTo("Spring");
+		}
+
+		@Test
+		void canCustomizeHttpUrlConnectionForExistsFallback() throws Exception {
+			String baseUrl = startServer(false);
 			CustomResource resource = new CustomResource(baseUrl + "/resource");
 			assertThat(resource.exists()).isTrue();
 			RecordedRequest request = this.server.takeRequest();
@@ -404,7 +434,7 @@ class ResourceTests {
 
 		@Test
 		void canCustomizeHttpUrlConnectionForRead() throws Exception {
-			String baseUrl = startServer();
+			String baseUrl = startServer(true);
 			CustomResource resource = new CustomResource(baseUrl + "/resource");
 			assertThat(resource.getInputStream()).hasContent("Spring");
 			RecordedRequest request = this.server.takeRequest();
@@ -414,15 +444,15 @@ class ResourceTests {
 
 		@Test
 		void useUserInfoToSetBasicAuth() throws Exception {
-			startServer();
-			UrlResource resource = new UrlResource("http://alice:secret@localhost:"
-					+ this.server.getPort() + "/resource");
+			startServer(true);
+			UrlResource resource = new UrlResource(
+					"http://alice:secret@localhost:" + this.server.getPort() + "/resource");
 			assertThat(resource.getInputStream()).hasContent("Spring");
 			RecordedRequest request = this.server.takeRequest();
 			String authorization = request.getHeader("Authorization");
 			assertThat(authorization).isNotNull().startsWith("Basic ");
-			assertThat(new String(Base64.getDecoder().decode(
-					authorization.substring(6)), StandardCharsets.ISO_8859_1)).isEqualTo("alice:secret");
+			assertThat(new String(Base64.getDecoder().decode(authorization.substring(6)),
+					StandardCharsets.ISO_8859_1)).isEqualTo("alice:secret");
 		}
 
 		@AfterEach
@@ -430,8 +460,8 @@ class ResourceTests {
 			this.server.shutdown();
 		}
 
-		private String startServer() throws Exception {
-			this.server.setDispatcher(new ResourceDispatcher());
+		private String startServer(boolean withHeadSupport) throws Exception {
+			this.server.setDispatcher(new ResourceDispatcher(withHeadSupport));
 			this.server.start();
 			return "http://localhost:" + this.server.getPort();
 		}
@@ -450,15 +480,26 @@ class ResourceTests {
 
 		class ResourceDispatcher extends Dispatcher {
 
+			boolean withHeadSupport;
+
+			public ResourceDispatcher(boolean withHeadSupport) {
+				this.withHeadSupport = withHeadSupport;
+			}
+
 			@Override
 			public MockResponse dispatch(RecordedRequest request) {
 				if (request.getPath().equals("/resource")) {
 					return switch (request.getMethod()) {
-						case "HEAD" -> new MockResponse()
-									.addHeader("Content-Length", "6");
+						case "HEAD" -> (this.withHeadSupport ?
+								new MockResponse()
+										.addHeader("Content-Type", "text/plain")
+										.addHeader("Content-Length", "6")
+										.addHeader("Last-Modified", LAST_MODIFIED) :
+								new MockResponse().setResponseCode(405));
 						case "GET" -> new MockResponse()
-									.addHeader("Content-Length", "6")
 									.addHeader("Content-Type", "text/plain")
+									.addHeader("Content-Length", "6")
+									.addHeader("Last-Modified", LAST_MODIFIED)
 									.setBody("Spring");
 						default -> new MockResponse().setResponseCode(404);
 					};

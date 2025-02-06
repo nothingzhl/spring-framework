@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,38 +26,51 @@ import org.springframework.test.context.bean.override.BeanOverrideContextCustomi
 import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 
 /**
- * Tests for {@link TestBean}.
+ * Tests for {@link TestBean @TestBean}.
  *
  * @author Stephane Nicoll
+ * @author Sam Brannen
  */
 public class TestBeanTests {
 
 	@Test
-	void contextCustomizerCannotBeCreatedWithNoSuchBeanName() {
+	void cannotOverrideBeanByNameWithNoSuchBeanName() {
 		GenericApplicationContext context = new GenericApplicationContext();
 		context.registerBean("anotherBean", String.class, () -> "example");
 		BeanOverrideContextCustomizerTestUtils.customizeApplicationContext(FailureByNameLookup.class, context);
 		assertThatIllegalStateException()
 				.isThrownBy(context::refresh)
 				.withMessage("""
-						Unable to override bean 'beanToOverride': there is no bean definition \
-						to replace with that name of type java.lang.String""");
+						Unable to replace bean: there is no bean with name 'beanToOverride' \
+						and type java.lang.String (as required by field 'FailureByNameLookup.example').""");
 	}
 
 	@Test
-	void contextCustomizerCannotBeCreatedWithNoSuchBeanType() {
+	void cannotOverrideBeanByNameWithBeanOfWrongType() {
+		GenericApplicationContext context = new GenericApplicationContext();
+		context.registerBean("beanToOverride", Integer.class, () -> 42);
+		BeanOverrideContextCustomizerTestUtils.customizeApplicationContext(FailureByNameLookup.class, context);
+		assertThatIllegalStateException()
+				.isThrownBy(context::refresh)
+				.withMessage("""
+						Unable to replace bean: there is no bean with name 'beanToOverride' \
+						and type java.lang.String (as required by field 'FailureByNameLookup.example').""");
+	}
+
+	@Test
+	void cannotOverrideBeanByTypeWithNoSuchBeanType() {
 		GenericApplicationContext context = new GenericApplicationContext();
 		BeanOverrideContextCustomizerTestUtils.customizeApplicationContext(FailureByTypeLookup.class, context);
 		assertThatIllegalStateException()
 				.isThrownBy(context::refresh)
 				.withMessage("""
-						Unable to override bean: no bean definitions of \
-						type %s (as required by annotated field '%s.example')""".formatted(
-						String.class.getName(), FailureByTypeLookup.class.getSimpleName()));
+						Unable to override bean: there are no beans of \
+						type %s (as required by field '%s.example').""",
+						String.class.getName(), FailureByTypeLookup.class.getSimpleName());
 	}
 
 	@Test
-	void contextCustomizerCannotBeCreatedWithTooManyBeansOfThatType() {
+	void cannotOverrideBeanByTypeWithTooManyBeansOfThatType() {
 		GenericApplicationContext context = new GenericApplicationContext();
 		context.registerBean("bean1", String.class, () -> "example1");
 		context.registerBean("bean2", String.class, () -> "example2");
@@ -65,22 +78,8 @@ public class TestBeanTests {
 		assertThatIllegalStateException()
 				.isThrownBy(context::refresh)
 				.withMessage("""
-						Unable to select a bean definition to override: found 2 bean definitions \
-						of type %s (as required by annotated field '%s.example'): %s""".formatted(
-						String.class.getName(), FailureByTypeLookup.class.getSimpleName(), List.of("bean1", "bean2")));
-	}
-
-	@Test
-	void contextCustomizerCannotBeCreatedWithBeanOfWrongType() {
-		GenericApplicationContext context = new GenericApplicationContext();
-		context.registerBean("beanToOverride", Integer.class, () -> 42);
-		BeanOverrideContextCustomizerTestUtils.customizeApplicationContext(FailureByNameLookup.class, context);
-		assertThatIllegalStateException()
-				.isThrownBy(context::refresh)
-				.withMessage("""
-						Unable to override bean 'beanToOverride': there is no bean definition \
-						to replace with that name of type %s""".formatted(
-						String.class.getName()));
+						Unable to select a bean to override: found 2 beans of type java.lang.String \
+						(as required by field 'FailureByTypeLookup.example'): %s""", List.of("bean1", "bean2"));
 	}
 
 	@Test
@@ -89,8 +88,8 @@ public class TestBeanTests {
 		assertThatIllegalStateException()
 				.isThrownBy(() -> BeanOverrideContextCustomizerTestUtils.customizeApplicationContext(
 						FailureMissingDefaultOverrideMethod.class, context))
-				.withMessage("No static method found named example() or beanToOverride() in %s with return type %s"
-						.formatted(FailureMissingDefaultOverrideMethod.class.getName(), String.class.getName()));
+				.withMessage("No static method found named example() or beanToOverride() in %s with return type %s",
+						FailureMissingDefaultOverrideMethod.class.getName(), String.class.getName());
 	}
 
 	@Test
@@ -99,8 +98,8 @@ public class TestBeanTests {
 		assertThatIllegalStateException()
 				.isThrownBy(() -> BeanOverrideContextCustomizerTestUtils.customizeApplicationContext(
 						FailureMissingExplicitOverrideMethod.class, context))
-				.withMessage("No static method found named createExample() in %s with return type %s"
-						.formatted(FailureMissingExplicitOverrideMethod.class.getName(), String.class.getName()));
+				.withMessage("No static method found named createExample() in %s with return type %s",
+						FailureMissingExplicitOverrideMethod.class.getName(), String.class.getName());
 	}
 
 	@Test
@@ -110,37 +109,38 @@ public class TestBeanTests {
 		assertThatIllegalStateException()
 				.isThrownBy(() -> BeanOverrideContextCustomizerTestUtils.customizeApplicationContext(
 						FailureOverrideInParentWithoutFactoryMethod.class, context))
-				.withMessage("No static method found named beanToOverride() in %s with return type %s"
-						.formatted(FailureOverrideInParentWithoutFactoryMethod.class.getName(), String.class.getName()));
+				.withMessage("No static method found named beanToOverride() in %s with return type %s",
+						AbstractByNameLookup.class.getName(), String.class.getName());
 	}
 
 	@Test
-	void contextCustomizerCannotBeCreatedWitCompetingOverrideMethods() {
+	void contextCustomizerCannotBeCreatedWithCompetingOverrideMethods() {
 		GenericApplicationContext context = new GenericApplicationContext();
 		context.registerBean("bean", String.class, () -> "example");
 		assertThatIllegalStateException()
 				.isThrownBy(() -> BeanOverrideContextCustomizerTestUtils.customizeApplicationContext(
 						FailureCompetingOverrideMethods.class, context))
-				.withMessage("Found 2 competing static methods named example() or beanToOverride() in %s with return type %s"
-						.formatted(FailureCompetingOverrideMethods.class.getName(), String.class.getName()));
+				.withMessage("Found 2 competing static methods named example() or beanToOverride() in %s with return type %s",
+						FailureCompetingOverrideMethods.class.getName(), String.class.getName());
 	}
 
-	static class FailureByTypeLookup {
 
-		@TestBean
+	static class FailureByNameLookup {
+
+		@TestBean(name = "beanToOverride", enforceOverride = true)
 		private String example;
 
-		private static String example() {
+		static String example() {
 			throw new IllegalStateException("Should not be called");
 		}
 	}
 
-	static class FailureByNameLookup {
+	static class FailureByTypeLookup {
 
-		@TestBean(name = "beanToOverride")
+		@TestBean(enforceOverride = true)
 		private String example;
 
-		private static String example() {
+		static String example() {
 			throw new IllegalStateException("Should not be called");
 		}
 	}
@@ -150,9 +150,7 @@ public class TestBeanTests {
 		@TestBean(name = "beanToOverride")
 		private String example;
 
-		// Expected static String example() { ... }
-		// or static String beanToOverride() { ... }
-
+		// No example() or beanToOverride() method
 	}
 
 	static class FailureMissingExplicitOverrideMethod {
@@ -160,27 +158,21 @@ public class TestBeanTests {
 		@TestBean(methodName = "createExample")
 		private String example;
 
-		// Expected static String createExample() { ... }
-
+		// NO createExample() method
 	}
 
 	abstract static class AbstractByNameLookup {
 
-		@TestBean(methodName = "beanToOverride")
-		protected String beanToOverride;
+		@TestBean
+		String beanToOverride;
 
+		// No beanToOverride() method
 	}
 
 	static class FailureOverrideInParentWithoutFactoryMethod extends AbstractByNameLookup {
-
-		// No beanToOverride() method
-
 	}
 
 	abstract static class AbstractCompetingMethods {
-
-		@TestBean(name = "beanToOverride")
-		protected String example;
 
 		static String example() {
 			throw new IllegalStateException("Should not be called");
@@ -189,10 +181,12 @@ public class TestBeanTests {
 
 	static class FailureCompetingOverrideMethods extends AbstractCompetingMethods {
 
+		@TestBean(name = "beanToOverride")
+		String example;
+
 		static String beanToOverride() {
 			throw new IllegalStateException("Should not be called");
 		}
-
 	}
 
 }

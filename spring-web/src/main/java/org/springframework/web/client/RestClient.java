@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,11 +23,13 @@ import java.nio.charset.Charset;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
 import io.micrometer.observation.ObservationRegistry;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
@@ -44,7 +46,8 @@ import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.http.client.observation.ClientRequestObservationConvention;
 import org.springframework.http.converter.HttpMessageConverter;
-import org.springframework.lang.Nullable;
+import org.springframework.lang.CheckReturnValue;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.util.DefaultUriBuilderFactory;
 import org.springframework.web.util.UriBuilder;
 import org.springframework.web.util.UriBuilderFactory;
@@ -73,6 +76,7 @@ import org.springframework.web.util.UriBuilderFactory;
  * </ul>
  *
  * @author Arjen Poutsma
+ * @author Sebastien Deleuze
  * @since 6.1
  */
 public interface RestClient {
@@ -312,6 +316,23 @@ public interface RestClient {
 		Builder defaultHeaders(Consumer<HttpHeaders> headersConsumer);
 
 		/**
+		 * Global option to specify a cookie to be added to every request,
+		 * if the request does not already contain such a cookie.
+		 * @param cookie the cookie name
+		 * @param values the cookie values
+		 * @since 6.2
+		 */
+		Builder defaultCookie(String cookie, String... values);
+
+		/**
+		 * Provides access to every {@link #defaultCookie(String, String...)}
+		 * declared so far with the possibility to add, replace, or remove.
+		 * @param cookiesConsumer a function that consumes the cookies map
+		 * @since 6.2
+		 */
+		Builder defaultCookies(Consumer<MultiValueMap<String, String>> cookiesConsumer);
+
+		/**
 		 * Provide a consumer to customize every request being built.
 		 * @param defaultRequest the consumer to use for modifying requests
 		 * @return this builder
@@ -338,6 +359,10 @@ public interface RestClient {
 		 * to apply to every response. Such default handlers are applied in the
 		 * order in which they are registered, and after any others that are
 		 * registered for a specific response.
+		 * <p>The first status handler who claims that a response has an
+		 * error is invoked. If you want to disable other defaults, consider
+		 * using {@link #defaultStatusHandler(Predicate, ResponseSpec.ErrorHandler)}
+		 * with a predicate that matches all status codes.
 		 * @param errorHandler handler that typically, though not necessarily,
 		 * throws an exception
 		 * @return this builder
@@ -361,6 +386,15 @@ public interface RestClient {
 		Builder requestInterceptors(Consumer<List<ClientHttpRequestInterceptor>> interceptorsConsumer);
 
 		/**
+		 * Enable buffering of request and response, aggregating all content before
+		 * it is sent, and making it possible to read the response body repeatedly.
+		 * @param predicate to determine whether to buffer for the given request
+		 * @return this builder
+		 * @since 7.0
+		 */
+		Builder bufferContent(BiPredicate<URI, HttpMethod> predicate);
+
+		/**
 		 * Add the given request initializer to the end of the initializer chain.
 		 * @param initializer the initializer to be added to the chain
 		 * @return this builder
@@ -379,7 +413,7 @@ public interface RestClient {
 		/**
 		 * Configure the {@link ClientHttpRequestFactory} to use. This is useful
 		 * for plugging in and/or customizing options of the underlying HTTP
-		 * client library (e.g. SSL).
+		 * client library (for example, SSL).
 		 * <p>If no request factory is specified, {@code RestClient} uses
 		 * {@linkplain org.springframework.http.client.HttpComponentsClientHttpRequestFactory Apache Http Client},
 		 * {@linkplain org.springframework.http.client.JettyClientHttpRequestFactory Jetty Http Client}
@@ -395,10 +429,21 @@ public interface RestClient {
 
 		/**
 		 * Configure the message converters for the {@code RestClient} to use.
-		 * @param configurer the configurer to apply
+		 * @param configurer the configurer to apply on the list of default
+		 * {@link HttpMessageConverter} pre-initialized
 		 * @return this builder
+		 * @see #messageConverters(List)
 		 */
 		Builder messageConverters(Consumer<List<HttpMessageConverter<?>>> configurer);
+
+		/**
+		 * Set the message converters for the {@code RestClient} to use.
+		 * @param messageConverters the list of {@link HttpMessageConverter} to use
+		 * @return this builder
+		 * @since 6.2
+		 * @see #messageConverters(Consumer)
+		 */
+		Builder messageConverters(List<HttpMessageConverter<?>> messageConverters);
 
 		/**
 		 * Configure the {@link io.micrometer.observation.ObservationRegistry} to use
@@ -448,24 +493,24 @@ public interface RestClient {
 		 * Specify the URI using a fully constructed {@link URI}.
 		 * <p>If the given URI is absolute, it is used as given. If it is
 		 * a relative URI, the {@link UriBuilderFactory} configured for
-		 * the client (e.g. with a base URI) will be used to
+		 * the client (for example, with a base URI) will be used to
 		 * {@linkplain URI#resolve(URI) resolve} the given URI against.
 		 */
 		S uri(URI uri);
 
 		/**
 		 * Specify the URI for the request using a URI template and URI variables.
-		 * <p>If a {@link UriBuilderFactory} was configured for the client (e.g.
+		 * <p>If a {@link UriBuilderFactory} was configured for the client (for example,
 		 * with a base URI) it will be used to expand the URI template.
 		 */
-		S uri(String uri, Object... uriVariables);
+		S uri(String uri, @Nullable Object... uriVariables);
 
 		/**
 		 * Specify the URI for the request using a URI template and URI variables.
-		 * <p>If a {@link UriBuilderFactory} was configured for the client (e.g.
+		 * <p>If a {@link UriBuilderFactory} was configured for the client (for example,
 		 * with a base URI) it will be used to expand the URI template.
 		 */
-		S uri(String uri, Map<String, ?> uriVariables);
+		S uri(String uri, Map<String, ? extends @Nullable Object> uriVariables);
 
 		/**
 		 * Specify the URI starting with a URI template and finishing off with a
@@ -502,6 +547,24 @@ public interface RestClient {
 		 * @return this builder
 		 */
 		S acceptCharset(Charset... acceptableCharsets);
+
+		/**
+		 * Add a cookie with the given name and value.
+		 * @param name the cookie name
+		 * @param value the cookie value
+		 * @return this builder
+		 * @since 6.2
+		 */
+		S cookie(String name, String value);
+
+		/**
+		 * Provides access to every cookie declared so far with the possibility
+		 * to add, replace, or remove values.
+		 * @param cookiesConsumer the consumer to provide access to
+		 * @return this builder
+		 * @since 6.2
+		 */
+		S cookies(Consumer<MultiValueMap<String, String>> cookiesConsumer);
 
 		/**
 		 * Set the value of the {@code If-Modified-Since} header.
@@ -563,8 +626,10 @@ public interface RestClient {
 		S httpRequest(Consumer<ClientHttpRequest> requestConsumer);
 
 		/**
-		 * Proceed to declare how to extract the response. For example to extract
-		 * a {@link ResponseEntity} with status, headers, and body:
+		 * Enter the retrieve workflow and use the returned {@link ResponseSpec}
+		 * to select from a number of built-in options to extract the response.
+		 * For example:
+		 *
 		 * <pre class="code">
 		 * ResponseEntity&lt;Person&gt; entity = client.get()
 		 *     .uri("/persons/1")
@@ -580,12 +645,17 @@ public interface RestClient {
 		 *     .retrieve()
 		 *     .body(Person.class);
 		 * </pre>
+		 * Note that this method does not actually execute the request until you
+		 * call one of the returned {@link ResponseSpec}. Use the
+		 * {@link #exchange(ExchangeFunction)} variants if you need to separate
+		 * request execution from response extraction.
 		 * <p>By default, 4xx response code result in a
 		 * {@link HttpClientErrorException} and 5xx response codes in a
 		 * {@link HttpServerErrorException}. To customize error handling, use
 		 * {@link ResponseSpec#onStatus(Predicate, ResponseSpec.ErrorHandler) onStatus} handlers.
 		 * @return {@code ResponseSpec} to specify how to decode the body
 		 */
+		@CheckReturnValue
 		ResponseSpec retrieve();
 
 		/**
@@ -612,7 +682,7 @@ public interface RestClient {
 		 * @param <T> the type the response will be transformed to
 		 * @return the value returned from the exchange function
 		 */
-		default <T> T exchange(ExchangeFunction<T> exchangeFunction) {
+		default <T> @Nullable T exchange(ExchangeFunction<T> exchangeFunction) {
 			return exchange(exchangeFunction, true);
 		}
 
@@ -643,7 +713,7 @@ public interface RestClient {
 		 * @param <T> the type the response will be transformed to
 		 * @return the value returned from the exchange function
 		 */
-		<T> T exchange(ExchangeFunction<T> exchangeFunction, boolean close);
+		<T> @Nullable T exchange(ExchangeFunction<T> exchangeFunction, boolean close);
 
 
 		/**
@@ -660,7 +730,7 @@ public interface RestClient {
 			 * @return the exchanged type
 			 * @throws IOException in case of I/O errors
 			 */
-			T exchange(HttpRequest clientRequest, ConvertibleClientHttpResponse clientResponse) throws IOException;
+			@Nullable T exchange(HttpRequest clientRequest, ConvertibleClientHttpResponse clientResponse) throws IOException;
 		}
 
 
@@ -675,8 +745,7 @@ public interface RestClient {
 			 * @param <T> the body type
 			 * @return the body, or {@code null} if no response body was available
 			 */
-			@Nullable
-			<T> T bodyTo(Class<T> bodyType);
+			<T> @Nullable T bodyTo(Class<T> bodyType);
 
 			/**
 			 * Extract the response body as an object of the given type.
@@ -684,8 +753,7 @@ public interface RestClient {
 			 * @param <T> the body type
 			 * @return the body, or {@code null} if no response body was available
 			 */
-			@Nullable
-			<T> T bodyTo(ParameterizedTypeReference<T> bodyType);
+			<T> @Nullable T bodyTo(ParameterizedTypeReference<T> bodyType);
 
 		}
 	}
@@ -797,8 +865,7 @@ public interface RestClient {
 		 * {@link #onStatus(Predicate, ErrorHandler)} to customize error response
 		 * handling.
 		 */
-		@Nullable
-		<T> T body(Class<T> bodyType);
+		<T> @Nullable T body(Class<T> bodyType);
 
 		/**
 		 * Extract the body as an object of the given type.
@@ -810,8 +877,7 @@ public interface RestClient {
 		 * {@link #onStatus(Predicate, ErrorHandler)} to customize error response
 		 * handling.
 		 */
-		@Nullable
-		<T> T body(ParameterizedTypeReference<T> bodyType);
+		<T> @Nullable T body(ParameterizedTypeReference<T> bodyType);
 
 		/**
 		 * Return a {@code ResponseEntity} with the body decoded to an Object of

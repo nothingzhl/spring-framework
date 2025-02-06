@@ -30,13 +30,13 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.observation.DefaultServerRequestObservationConvention;
 import org.springframework.http.server.observation.ServerHttpObservationDocumentation;
 import org.springframework.http.server.observation.ServerRequestObservationContext;
 import org.springframework.http.server.observation.ServerRequestObservationConvention;
-import org.springframework.lang.Nullable;
 
 
 /**
@@ -119,13 +119,13 @@ public class ServerHttpObservationFilter extends OncePerRequestFilter {
 			throw ex;
 		}
 		finally {
-			// If async is started, register a listener for completion notification.
-			if (request.isAsyncStarted()) {
+			// If async is started during the first dispatch, register a listener for completion notification.
+			if (request.isAsyncStarted() && request.getDispatcherType() == DispatcherType.REQUEST) {
 				request.getAsyncContext().addListener(new ObservationAsyncListener(observation));
 			}
 			// scope is opened for ASYNC dispatches, but the observation will be closed
 			// by the async listener.
-			else if (request.getDispatcherType() != DispatcherType.ASYNC){
+			else if (!isAsyncDispatch(request)) {
 				Throwable error = fetchException(request);
 				if (error != null) {
 					observation.error(error);
@@ -160,13 +160,11 @@ public class ServerHttpObservationFilter extends OncePerRequestFilter {
 		return observation;
 	}
 
-	@Nullable
-	static Throwable unwrapServletException(Throwable ex) {
+	static @Nullable Throwable unwrapServletException(Throwable ex) {
 		return (ex instanceof ServletException) ? ex.getCause() : ex;
 	}
 
-	@Nullable
-	static Throwable fetchException(ServletRequest request) {
+	static @Nullable Throwable fetchException(ServletRequest request) {
 		return (Throwable) request.getAttribute(RequestDispatcher.ERROR_EXCEPTION);
 	}
 
@@ -180,6 +178,7 @@ public class ServerHttpObservationFilter extends OncePerRequestFilter {
 
 		@Override
 		public void onStartAsync(AsyncEvent event) {
+			event.getAsyncContext().addListener(this);
 		}
 
 		@Override

@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,12 +18,14 @@ package org.springframework.beans.factory;
 
 import java.util.Iterator;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
+import org.jspecify.annotations.Nullable;
+
 import org.springframework.beans.BeansException;
 import org.springframework.core.OrderComparator;
-import org.springframework.lang.Nullable;
 
 /**
  * A variant of {@link ObjectFactory} designed specifically for injection points,
@@ -32,16 +34,18 @@ import org.springframework.lang.Nullable;
  * <p>In a {@link BeanFactory} environment, every {@code ObjectProvider} obtained
  * from the factory will be bound to its {@code BeanFactory} for a specific bean
  * type, matching all provider calls against factory-registered bean definitions.
+ * Note that all such calls dynamically operate on the underlying factory state,
+ * freshly resolving the requested target object on every call.
  *
  * <p>As of 5.1, this interface extends {@link Iterable} and provides {@link Stream}
  * support. It can be therefore be used in {@code for} loops, provides {@link #forEach}
  * iteration and allows for collection-style {@link #stream} access.
  *
  * <p>As of 6.2, this interface declares default implementations for all methods.
- * This makes it easier to implement in a custom fashion, e.g. for unit tests.
+ * This makes it easier to implement in a custom fashion, for example, for unit tests.
  * For typical purposes, implement {@link #stream()} to enable all other methods.
  * Alternatively, you may implement the specific methods that your callers expect,
- * e.g. just {@link #getObject()} or {@link #getIfAvailable()}.
+ * for example, just {@link #getObject()} or {@link #getIfAvailable()}.
  *
  * @author Juergen Hoeller
  * @since 4.3
@@ -50,6 +54,15 @@ import org.springframework.lang.Nullable;
  * @see org.springframework.beans.factory.annotation.Autowired
  */
 public interface ObjectProvider<T> extends ObjectFactory<T>, Iterable<T> {
+
+	/**
+	 * A predicate for unfiltered type matches.
+	 * @since 6.2.3
+	 * @see #stream(Predicate)
+	 * @see #orderedStream(Predicate)
+	 */
+	Predicate<Class<?>> UNFILTERED = (clazz -> true);
+
 
 	@Override
 	default T getObject() throws BeansException {
@@ -74,7 +87,7 @@ public interface ObjectProvider<T> extends ObjectFactory<T>, Iterable<T> {
 	 * @throws BeansException in case of creation errors
 	 * @see #getObject()
 	 */
-	default T getObject(Object... args) throws BeansException {
+	default T getObject(@Nullable Object... args) throws BeansException {
 		throw new UnsupportedOperationException("Retrieval with arguments not supported -" +
 				"for custom ObjectProvider classes, implement getObject(Object...) for your purposes");
 	}
@@ -86,8 +99,7 @@ public interface ObjectProvider<T> extends ObjectFactory<T>, Iterable<T> {
 	 * @throws BeansException in case of creation errors
 	 * @see #getObject()
 	 */
-	@Nullable
-	default T getIfAvailable() throws BeansException {
+	default @Nullable T getIfAvailable() throws BeansException {
 		try {
 			return getObject();
 		}
@@ -139,8 +151,7 @@ public interface ObjectProvider<T> extends ObjectFactory<T>, Iterable<T> {
 	 * @throws BeansException in case of creation errors
 	 * @see #getObject()
 	 */
-	@Nullable
-	default T getIfUnique() throws BeansException {
+	default @Nullable T getIfUnique() throws BeansException {
 		try {
 			return getObject();
 		}
@@ -196,6 +207,10 @@ public interface ObjectProvider<T> extends ObjectFactory<T>, Iterable<T> {
 	/**
 	 * Return a sequential {@link Stream} over all matching object instances,
 	 * without specific ordering guarantees (but typically in registration order).
+	 * <p>Note: The result may be filtered by default according to qualifiers on the
+	 * injection point versus target beans and the general autowire candidate status
+	 * of matching beans. For custom filtering against the raw type matches, use
+	 * {@link #stream(Predicate)} instead (potentially with {@link #UNFILTERED}).
 	 * @since 5.1
 	 * @see #iterator()
 	 * @see #orderedStream()
@@ -217,12 +232,44 @@ public interface ObjectProvider<T> extends ObjectFactory<T>, Iterable<T> {
 	 * {@link #stream()} method. You may override this to apply an
 	 * {@link org.springframework.core.annotation.AnnotationAwareOrderComparator}
 	 * if necessary.
+	 * <p>Note: The result may be filtered by default according to qualifiers on the
+	 * injection point versus target beans and the general autowire candidate status
+	 * of matching beans. For custom filtering against the raw type matches, use
+	 * {@link #stream(Predicate)} instead (potentially with {@link #UNFILTERED}).
 	 * @since 5.1
 	 * @see #stream()
 	 * @see org.springframework.core.OrderComparator
 	 */
 	default Stream<T> orderedStream() {
 		return stream().sorted(OrderComparator.INSTANCE);
+	}
+
+	/**
+	 * Return a custom-filtered {@link Stream} over all matching object instances,
+	 * without specific ordering guarantees (but typically in registration order).
+	 * @param customFilter a custom type filter for selecting beans among the raw
+	 * bean type matches (or {@link #UNFILTERED} for all raw type matches without
+	 * any default filtering)
+	 * @since 6.2.3
+	 * @see #stream()
+	 * @see #orderedStream(Predicate)
+	 */
+	default Stream<T> stream(Predicate<Class<?>> customFilter) {
+		return stream().filter(obj -> customFilter.test(obj.getClass()));
+	}
+
+	/**
+	 * Return a custom-filtered {@link Stream} over all matching object instances,
+	 * pre-ordered according to the factory's common order comparator.
+	 * @param customFilter a custom type filter for selecting beans among the raw
+	 * bean type matches (or {@link #UNFILTERED} for all raw type matches without
+	 * any default filtering)
+	 * @since 6.2.3
+	 * @see #orderedStream()
+	 * @see #stream(Predicate)
+	 */
+	default Stream<T> orderedStream(Predicate<Class<?>> customFilter) {
+		return orderedStream().filter(obj -> customFilter.test(obj.getClass()));
 	}
 
 }

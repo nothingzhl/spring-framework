@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Tests for {@link ForwardedHeaderTransformer}.
  *
  * @author Rossen Stoyanchev
+ * @author Sebastien Deleuze
  */
 class ForwardedHeaderTransformerTests {
 
@@ -170,6 +171,17 @@ class ForwardedHeaderTransformerTests {
 		assertForwardedHeadersRemoved(request);
 	}
 
+	@Test // gh-33465
+	void shouldRemoveSingleTrailingSlash() {
+		HttpHeaders headers = new HttpHeaders();
+		headers.add("X-Forwarded-Prefix", "/prefix,/");
+		ServerHttpRequest request = this.requestMutator.apply(getRequest(headers));
+
+		assertThat(request.getURI()).isEqualTo(URI.create("https://example.com/prefix/path"));
+		assertThat(request.getPath().value()).isEqualTo("/prefix/path");
+		assertForwardedHeadersRemoved(request);
+	}
+
 	@Test
 	void forwardedForNotPresent() {
 		HttpHeaders headers = new HttpHeaders();
@@ -228,7 +240,7 @@ class ForwardedHeaderTransformerTests {
 
 	private void assertForwardedHeadersRemoved(ServerHttpRequest request) {
 		ForwardedHeaderTransformer.FORWARDED_HEADER_NAMES
-				.forEach(name -> assertThat(request.getHeaders().containsKey(name)).isFalse());
+				.forEach(name -> assertThat(request.getHeaders().containsHeader(name)).isFalse());
 	}
 
 }

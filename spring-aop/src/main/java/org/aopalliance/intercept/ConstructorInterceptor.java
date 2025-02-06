@@ -16,14 +16,12 @@
 
 package org.aopalliance.intercept;
 
-import javax.annotation.Nonnull;
-
 /**
  * Intercepts the construction of a new object.
  *
  * <p>The user should implement the {@link
  * #construct(ConstructorInvocation)} method to modify the original
- * behavior. E.g. the following class implements a singleton
+ * behavior. For example, the following class implements a singleton
  * interceptor (allows only one unique instance for the intercepted
  * class):
  *
@@ -56,7 +54,6 @@ public interface ConstructorInterceptor extends Interceptor {
 	 * @throws Throwable if the interceptors or the target object
 	 * throws an exception
 	 */
-	@Nonnull
 	Object construct(ConstructorInvocation invocation) throws Throwable;
 
 }

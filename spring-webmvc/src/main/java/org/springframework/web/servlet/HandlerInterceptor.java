@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,8 +18,8 @@ package org.springframework.web.servlet;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.jspecify.annotations.Nullable;
 
-import org.springframework.lang.Nullable;
 import org.springframework.web.method.HandlerMethod;
 
 /**
@@ -31,7 +31,7 @@ import org.springframework.web.method.HandlerMethod;
  * <p>A HandlerInterceptor gets called before the appropriate HandlerAdapter
  * triggers the execution of the handler itself. This mechanism can be used
  * for a large field of preprocessing aspects, or common handler behavior
- * like locale or theme changes. Its main purpose is to allow for factoring
+ * like locale changes. Its main purpose is to allow for factoring
  * out repetitive handler code.
  *
  * <p>In an asynchronous processing scenario, the handler may be executed in a
@@ -61,7 +61,7 @@ import org.springframework.web.method.HandlerMethod;
  * common handler code and authorization checks. On the other hand, a Filter
  * is well-suited for request content and view content handling, like multipart
  * forms and GZIP compression. This typically shows when one needs to map the
- * filter to certain content types (e.g. images), or to all requests.
+ * filter to certain content types (for example, images), or to all requests.
  *
  * <p><strong>Note:</strong> Interceptors are not ideally suited as a security
  * layer due to the potential for a mismatch with annotated controller path matching.
@@ -75,7 +75,6 @@ import org.springframework.web.method.HandlerMethod;
  * @see org.springframework.web.servlet.handler.AbstractHandlerMapping#setInterceptors
  * @see org.springframework.web.servlet.handler.UserRoleAuthorizationInterceptor
  * @see org.springframework.web.servlet.i18n.LocaleChangeInterceptor
- * @see org.springframework.web.servlet.theme.ThemeChangeInterceptor
  * @see jakarta.servlet.Filter
  */
 public interface HandlerInterceptor {

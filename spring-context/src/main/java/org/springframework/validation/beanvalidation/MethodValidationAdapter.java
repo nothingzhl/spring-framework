@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package org.springframework.validation.beanvalidation;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -37,6 +38,7 @@ import jakarta.validation.Validator;
 import jakarta.validation.ValidatorFactory;
 import jakarta.validation.executable.ExecutableValidator;
 import jakarta.validation.metadata.ConstraintDescriptor;
+import org.jspecify.annotations.Nullable;
 
 import org.springframework.aop.framework.AopProxyUtils;
 import org.springframework.aop.support.AopUtils;
@@ -49,7 +51,6 @@ import org.springframework.core.GenericTypeResolver;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.ParameterNameDiscoverer;
 import org.springframework.core.annotation.AnnotationUtils;
-import org.springframework.lang.Nullable;
 import org.springframework.util.Assert;
 import org.springframework.util.function.SingletonSupplier;
 import org.springframework.validation.BeanPropertyBindingResult;
@@ -194,7 +195,7 @@ public class MethodValidationAdapter implements MethodValidator {
 	 * <li>{@link Conventions#getVariableNameForReturnType(Method, Class, Object)}
 	 * for a return type
 	 * </ul>
-	 * If a name cannot be determined, e.g. a return value with insufficient
+	 * If a name cannot be determined, for example, a return value with insufficient
 	 * type information, then it defaults to one of:
 	 * <ul>
 	 * <li>{@code "{methodName}.arg{index}"} for input parameters
@@ -234,8 +235,8 @@ public class MethodValidationAdapter implements MethodValidator {
 
 	@Override
 	public final MethodValidationResult validateArguments(
-			Object target, Method method, @Nullable MethodParameter[] parameters,
-			Object[] arguments, Class<?>[] groups) {
+			Object target, Method method, MethodParameter @Nullable [] parameters,
+			@Nullable Object[] arguments, Class<?>[] groups) {
 
 		Set<ConstraintViolation<Object>> violations =
 				invokeValidatorForArguments(target, method, arguments, groups);
@@ -253,7 +254,7 @@ public class MethodValidationAdapter implements MethodValidator {
 	 * Invoke the validator, and return the resulting violations.
 	 */
 	public final Set<ConstraintViolation<Object>> invokeValidatorForArguments(
-			Object target, Method method, Object[] arguments, Class<?>[] groups) {
+			Object target, Method method, @Nullable Object[] arguments, Class<?>[] groups) {
 
 		ExecutableValidator execVal = this.validator.get().forExecutables();
 		try {
@@ -297,10 +298,11 @@ public class MethodValidationAdapter implements MethodValidator {
 	private MethodValidationResult adaptViolations(
 			Object target, Method method, Set<ConstraintViolation<Object>> violations,
 			Function<Integer, MethodParameter> parameterFunction,
-			Function<Integer, Object> argumentFunction) {
+			Function<Integer, @Nullable Object> argumentFunction) {
 
 		Map<Path.Node, ParamValidationResultBuilder> paramViolations = new LinkedHashMap<>();
 		Map<Path.Node, ParamErrorsBuilder> nestedViolations = new LinkedHashMap<>();
+		List<MessageSourceResolvable> crossParamErrors = null;
 
 		for (ConstraintViolation<Object> violation : violations) {
 			Iterator<Path.Node> nodes = violation.getPropertyPath().iterator();
@@ -315,13 +317,18 @@ public class MethodValidationAdapter implements MethodValidator {
 				else if (node.getKind().equals(ElementKind.RETURN_VALUE)) {
 					parameter = parameterFunction.apply(-1);
 				}
+				else if (node.getKind().equals(ElementKind.CROSS_PARAMETER)) {
+					crossParamErrors = (crossParamErrors != null ? crossParamErrors : new ArrayList<>());
+					crossParamErrors.add(createCrossParamError(target, method, violation));
+					break;
+				}
 				else {
 					continue;
 				}
 
 				Object arg = argumentFunction.apply(parameter.getParameterIndex());
 
-				// If the arg is a container, we need to element, but the only way to extract it
+				// If the arg is a container, we need the element, but the only way to extract it
 				// is to check for and use a container index or key on the next node:
 				// https://github.com/jakartaee/validation/issues/194
 
@@ -346,17 +353,21 @@ public class MethodValidationAdapter implements MethodValidator {
 					value = map.get(key);
 					container = map;
 				}
+				else if (arg instanceof Iterable<?>) {
+					// No index or key, cannot access the specific value
+					value = arg;
+					container = arg;
+				}
 				else if (arg instanceof Optional<?> optional) {
 					value = optional.orElse(null);
 					container = optional;
 				}
 				else {
-					Assert.state(!node.isInIterable(), "No way to unwrap Iterable without index");
 					value = arg;
 					container = null;
 				}
 
-				if (node.getKind().equals(ElementKind.PROPERTY)) {
+				if (node.getKind().equals(ElementKind.PROPERTY) || node.getKind().equals(ElementKind.BEAN)) {
 					nestedViolations
 							.computeIfAbsent(parameterNode, k ->
 									new ParamErrorsBuilder(parameter, value, container, index, key))
@@ -378,7 +389,8 @@ public class MethodValidationAdapter implements MethodValidator {
 		nestedViolations.forEach((key, builder) -> resultList.add(builder.build()));
 		resultList.sort(resultComparator);
 
-		return MethodValidationResult.create(target, method, resultList);
+		return MethodValidationResult.create(target, method, resultList,
+				(crossParamErrors != null ? crossParamErrors : Collections.emptyList()));
 	}
 
 	private MethodParameter initMethodParameter(Method method, int index) {
@@ -399,7 +411,7 @@ public class MethodValidationAdapter implements MethodValidator {
 		String[] codes = this.messageCodesResolver.resolveMessageCodes(code, objectName, paramName, parameterType);
 		Object[] arguments = this.validatorAdapter.get().getArgumentsForConstraint(objectName, paramName, descriptor);
 
-		return new DefaultMessageSourceResolvable(codes, arguments, violation.getMessage());
+		return new ViolationMessageSourceResolvable(codes, arguments, violation.getMessage(), violation);
 	}
 
 	private BindingResult createBindingResult(MethodParameter parameter, @Nullable Object argument) {
@@ -407,6 +419,19 @@ public class MethodValidationAdapter implements MethodValidator {
 		BeanPropertyBindingResult result = new BeanPropertyBindingResult(argument, objectName);
 		result.setMessageCodesResolver(this.messageCodesResolver);
 		return result;
+	}
+
+	private MessageSourceResolvable createCrossParamError(
+			Object target, Method method, ConstraintViolation<Object> violation) {
+
+		String objectName = Conventions.getVariableName(target) + "#" + method.getName();
+
+		ConstraintDescriptor<?> descriptor = violation.getConstraintDescriptor();
+		String code = descriptor.getAnnotation().annotationType().getSimpleName();
+		String[] codes = this.messageCodesResolver.resolveMessageCodes(code, objectName);
+		Object[] arguments = this.validatorAdapter.get().getArgumentsForConstraint(objectName, "", descriptor);
+
+		return new ViolationMessageSourceResolvable(codes, arguments, violation.getMessage(), violation);
 	}
 
 
@@ -436,17 +461,13 @@ public class MethodValidationAdapter implements MethodValidator {
 
 		private final MethodParameter parameter;
 
-		@Nullable
-		private final Object value;
+		private final @Nullable Object value;
 
-		@Nullable
-		private final Object container;
+		private final @Nullable Object container;
 
-		@Nullable
-		private final Integer containerIndex;
+		private final @Nullable Integer containerIndex;
 
-		@Nullable
-		private final Object containerKey;
+		private final @Nullable Object containerKey;
 
 		private final List<MessageSourceResolvable> resolvableErrors = new ArrayList<>();
 
@@ -469,7 +490,11 @@ public class MethodValidationAdapter implements MethodValidator {
 		public ParameterValidationResult build() {
 			return new ParameterValidationResult(
 					this.parameter, this.value, this.resolvableErrors, this.container,
-					this.containerIndex, this.containerKey);
+					this.containerIndex, this.containerKey,
+					(error, sourceType) -> {
+						Assert.isTrue(sourceType.equals(ConstraintViolation.class), "Unexpected source type");
+						return ((ViolationMessageSourceResolvable) error).getViolation();
+					});
 		}
 	}
 
@@ -482,17 +507,13 @@ public class MethodValidationAdapter implements MethodValidator {
 
 		private final MethodParameter parameter;
 
-		@Nullable
-		private final Object bean;
+		private final @Nullable Object bean;
 
-		@Nullable
-		private final Object container;
+		private final @Nullable Object container;
 
-		@Nullable
-		private final Integer containerIndex;
+		private final @Nullable Integer containerIndex;
 
-		@Nullable
-		private final Object containerKey;
+		private final @Nullable Object containerKey;
 
 		private final Errors errors;
 
@@ -519,6 +540,24 @@ public class MethodValidationAdapter implements MethodValidator {
 			return new ParameterErrors(
 					this.parameter, this.bean, this.errors, this.container,
 					this.containerIndex, this.containerKey);
+		}
+	}
+
+
+	@SuppressWarnings("serial")
+	private static class ViolationMessageSourceResolvable extends DefaultMessageSourceResolvable {
+
+		private final transient ConstraintViolation<Object> violation;
+
+		public ViolationMessageSourceResolvable(
+				String[] codes, Object[] arguments, String defaultMessage, ConstraintViolation<Object> violation) {
+
+			super(codes, arguments, defaultMessage);
+			this.violation = violation;
+		}
+
+		public ConstraintViolation<Object> getViolation() {
+			return this.violation;
 		}
 	}
 

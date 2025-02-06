@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-2025 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -48,6 +48,7 @@ import static org.mockito.Mockito.mock;
  * @author Eddú Meléndez
  * @author Rob Winch
  * @author Brian Clozel
+ * @author Sebastien Deleuze
  */
 class ForwardedHeaderFilterTests {
 
@@ -113,7 +114,7 @@ class ForwardedHeaderFilterTests {
 		this.request.addHeader(X_FORWARDED_HOST, "84.198.58.199");
 		this.request.addHeader(X_FORWARDED_PORT, "443");
 		this.request.addHeader("foo", "bar");
-		this.request.addHeader(X_FORWARDED_FOR, "203.0.113.195");
+		this.request.addHeader(X_FORWARDED_FOR, "[203.0.113.195]");
 
 		this.filter.doFilter(this.request, new MockHttpServletResponse(), this.filterChain);
 		HttpServletRequest actual = (HttpServletRequest) this.filterChain.getRequest();
@@ -124,7 +125,7 @@ class ForwardedHeaderFilterTests {
 		assertThat(actual.getServerName()).isEqualTo("84.198.58.199");
 		assertThat(actual.getServerPort()).isEqualTo(443);
 		assertThat(actual.isSecure()).isTrue();
-		assertThat(actual.getRemoteAddr()).isEqualTo(actual.getRemoteHost()).isEqualTo("203.0.113.195");
+		assertThat(actual.getRemoteAddr()).isEqualTo(actual.getRemoteHost()).isEqualTo("[203.0.113.195]");
 
 		assertThat(actual.getHeader(X_FORWARDED_PROTO)).isNull();
 		assertThat(actual.getHeader(X_FORWARDED_HOST)).isNull();
@@ -443,6 +444,15 @@ class ForwardedHeaderFilterTests {
 		}
 
 		@Test
+		void shouldRemoveSingleTrailingSlash() throws Exception {
+			request.addHeader(X_FORWARDED_PREFIX, "/prefix,/");
+			request.setRequestURI("/mvc-showcase");
+
+			HttpServletRequest actual = filterAndGetWrappedRequest();
+			assertThat(actual.getRequestURL().toString()).isEqualTo("http://localhost/prefix/mvc-showcase");
+		}
+
+		@Test
 		void requestURLNewStringBuffer() throws Exception {
 			request.addHeader(X_FORWARDED_PREFIX, "/prefix/");
 			request.setRequestURI("/mvc-showcase");
@@ -639,7 +649,7 @@ class ForwardedHeaderFilterTests {
 
 			String location = "//other.info/parent/../foo/bar";
 			String redirectedUrl = sendRedirect(location);
-			assertThat(redirectedUrl).isEqualTo(("https://other.info/foo/bar"));
+			assertThat(redirectedUrl).isEqualTo(("https:" + location));
 		}
 
 		@Test

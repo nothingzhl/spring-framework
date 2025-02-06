@@ -20,7 +20,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.function.Supplier;
 
-import org.springframework.lang.Nullable;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Expressions are executed in an evaluation context. It is in this context that
@@ -89,8 +89,7 @@ public interface EvaluationContext {
 	/**
 	 * Return a bean resolver that can look up beans by name.
 	 */
-	@Nullable
-	BeanResolver getBeanResolver();
+	@Nullable BeanResolver getBeanResolver();
 
 	/**
 	 * Return a type locator that can be used to find types, either by short or
@@ -150,7 +149,20 @@ public interface EvaluationContext {
 	 * @param name the name of the variable to look up
 	 * @return the value of the variable, or {@code null} if not found
 	 */
-	@Nullable
-	Object lookupVariable(String name);
+	@Nullable Object lookupVariable(String name);
+
+	/**
+	 * Determine if assignment is enabled within expressions evaluated by this evaluation
+	 * context.
+	 * <p>If this method returns {@code false}, the assignment ({@code =}), increment
+	 * ({@code ++}), and decrement ({@code --}) operators are disabled.
+	 * <p>By default, this method returns {@code true}. Concrete implementations may override
+	 * this <em>default</em> method to disable assignment.
+	 * @return {@code true} if assignment is enabled; {@code false} otherwise
+	 * @since 5.3.38
+	 */
+	default boolean isAssignmentEnabled() {
+		return true;
+	}
 
 }

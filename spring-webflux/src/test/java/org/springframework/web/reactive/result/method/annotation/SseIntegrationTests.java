@@ -24,6 +24,7 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.stream.Stream;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -43,7 +44,6 @@ import org.springframework.http.client.reactive.JettyClientHttpConnector;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.http.server.reactive.HttpHandler;
-import org.springframework.lang.Nullable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -53,6 +53,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.adapter.WebHttpHandlerBuilder;
 import org.springframework.web.testfixture.http.server.reactive.bootstrap.AbstractHttpHandlerIntegrationTests;
 import org.springframework.web.testfixture.http.server.reactive.bootstrap.HttpServer;
+import org.springframework.web.testfixture.http.server.reactive.bootstrap.JettyCoreHttpServer;
 import org.springframework.web.testfixture.http.server.reactive.bootstrap.JettyHttpServer;
 import org.springframework.web.testfixture.http.server.reactive.bootstrap.ReactorHttpServer;
 import org.springframework.web.testfixture.http.server.reactive.bootstrap.TomcatHttpServer;
@@ -127,7 +128,7 @@ class SseIntegrationTests extends AbstractHttpHandlerIntegrationTests {
 
 	@ParameterizedSseTest
 	void sseAsEvent(HttpServer httpServer, ClientHttpConnector connector) throws Exception {
-		assumeTrue(httpServer instanceof JettyHttpServer);
+		assumeTrue(httpServer instanceof JettyHttpServer || httpServer instanceof JettyCoreHttpServer);
 
 		startServer(httpServer, connector);
 
@@ -202,7 +203,7 @@ class SseIntegrationTests extends AbstractHttpHandlerIntegrationTests {
 	@RequestMapping("/sse")
 	static class SseController {
 
-		private static final Flux<Long> INTERVAL = testInterval(Duration.ofMillis(100), 50);
+		private static final Flux<Long> INTERVAL = testInterval(Duration.ofMillis(1), 50);
 
 		private final Sinks.Empty<Void> cancelSink = Sinks.empty();
 
@@ -302,18 +303,21 @@ class SseIntegrationTests extends AbstractHttpHandlerIntegrationTests {
 
 	static Stream<Arguments> arguments() {
 		return Stream.of(
-			args(new JettyHttpServer(), new ReactorClientHttpConnector()),
-			args(new JettyHttpServer(), new JettyClientHttpConnector()),
-			args(new JettyHttpServer(), new HttpComponentsClientHttpConnector()),
-			args(new ReactorHttpServer(), new ReactorClientHttpConnector()),
-			args(new ReactorHttpServer(), new JettyClientHttpConnector()),
-			args(new ReactorHttpServer(), new HttpComponentsClientHttpConnector()),
-			args(new TomcatHttpServer(), new ReactorClientHttpConnector()),
-			args(new TomcatHttpServer(), new JettyClientHttpConnector()),
-			args(new TomcatHttpServer(), new HttpComponentsClientHttpConnector()),
-			args(new UndertowHttpServer(), new ReactorClientHttpConnector()),
-			args(new UndertowHttpServer(), new JettyClientHttpConnector()),
-			args(new UndertowHttpServer(), new HttpComponentsClientHttpConnector())
+				args(new JettyHttpServer(), new ReactorClientHttpConnector()),
+				args(new JettyHttpServer(), new JettyClientHttpConnector()),
+				args(new JettyHttpServer(), new HttpComponentsClientHttpConnector()),
+				args(new JettyCoreHttpServer(), new ReactorClientHttpConnector()),
+				args(new JettyCoreHttpServer(), new JettyClientHttpConnector()),
+				args(new JettyCoreHttpServer(), new HttpComponentsClientHttpConnector()),
+				args(new ReactorHttpServer(), new ReactorClientHttpConnector()),
+				args(new ReactorHttpServer(), new JettyClientHttpConnector()),
+				args(new ReactorHttpServer(), new HttpComponentsClientHttpConnector()),
+				args(new TomcatHttpServer(), new ReactorClientHttpConnector()),
+				args(new TomcatHttpServer(), new JettyClientHttpConnector()),
+				args(new TomcatHttpServer(), new HttpComponentsClientHttpConnector()),
+				args(new UndertowHttpServer(), new ReactorClientHttpConnector()),
+				args(new UndertowHttpServer(), new JettyClientHttpConnector()),
+				args(new UndertowHttpServer(), new HttpComponentsClientHttpConnector())
 		);
 	}
 
