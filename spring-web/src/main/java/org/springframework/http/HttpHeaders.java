@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2025 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -455,18 +455,7 @@ public class HttpHeaders implements Serializable {
 	 */
 	public HttpHeaders(MultiValueMap<String, String> headers) {
 		Assert.notNull(headers, "MultiValueMap must not be null");
-		if (headers == EMPTY) {
-			this.headers = CollectionUtils.toMultiValueMap(new LinkedCaseInsensitiveMap<>(8, Locale.ENGLISH));
-		}
-		else if (headers instanceof HttpHeaders httpHeaders) {
-			while (httpHeaders.headers instanceof HttpHeaders wrapped) {
-				httpHeaders = wrapped;
-			}
-			this.headers = httpHeaders.headers;
-		}
-		else {
-			this.headers = headers;
-		}
+		this.headers = headers;
 	}
 
 	/**
@@ -491,6 +480,25 @@ public class HttpHeaders implements Serializable {
 		}
 	}
 
+	/**
+	 * Create a new {@code HttpHeaders} mutable instance and copy all header values given as a parameter.
+	 * @param headers the headers to copy
+	 * @since 7.0
+	 */
+	public static HttpHeaders copyOf(MultiValueMap<String, String> headers) {
+		HttpHeaders httpHeadersCopy = new HttpHeaders();
+		headers.forEach((key, values) -> httpHeadersCopy.put(key, new ArrayList<>(values)));
+		return httpHeadersCopy;
+	}
+
+	/**
+	 * Create a new {@code HttpHeaders} mutable instance and copy all header values given as a parameter.
+	 * @param httpHeaders the headers to copy
+	 * @since 7.0
+	 */
+	public static HttpHeaders copyOf(HttpHeaders httpHeaders) {
+		return copyOf(httpHeaders.headers);
+	}
 
 	/**
 	 * Get the list of header values for the given header name, if any.
@@ -1215,8 +1223,7 @@ public class HttpHeaders implements Serializable {
 			try {
 				port = Integer.parseInt(portString);
 			}
-			catch (NumberFormatException ex) {
-				// ignore
+			catch (NumberFormatException ignored) {
 			}
 		}
 

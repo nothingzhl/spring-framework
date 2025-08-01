@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2025 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -334,7 +334,7 @@ public class ResolvableType implements Serializable {
 				return otherBounds.isAssignableFrom(this, matchedBefore);
 			}
 			else if (!strict) {
-				return (matchedBefore != null ? otherBounds.equalsType(this) :
+				return (matchedBefore != null ? otherBounds.equalsType(this, matchedBefore) :
 						otherBounds.isAssignableTo(this, matchedBefore));
 			}
 			else {
@@ -951,10 +951,10 @@ public class ResolvableType implements Serializable {
 				return null;
 			}
 			TypeVariable<?>[] variables = resolved.getTypeParameters();
+			Type[] typeArguments = parameterizedType.getActualTypeArguments();
 			for (int i = 0; i < variables.length; i++) {
 				if (ObjectUtils.nullSafeEquals(variables[i].getName(), variable.getName())) {
-					Type actualType = parameterizedType.getActualTypeArguments()[i];
-					return forType(actualType, this.variableResolver);
+					return forType(typeArguments[i], this.variableResolver);
 				}
 			}
 			Type ownerType = parameterizedType.getOwnerType();
@@ -1775,11 +1775,13 @@ public class ResolvableType implements Serializable {
 		 * Return {@code true} if these bounds are equal to the specified type.
 		 * @param type the type to test against
 		 * @return {@code true} if these bounds are equal to the type
-		 * @since 6.2.3
+		 * @since 6.2.4
 		 */
-		public boolean equalsType(ResolvableType type) {
+		public boolean equalsType(ResolvableType type, @Nullable Map<Type, Type> matchedBefore) {
 			for (ResolvableType bound : this.bounds) {
-				if (!type.equalsType(bound)) {
+				if (this.kind == Kind.UPPER && bound.hasUnresolvableGenerics() ?
+						!type.isAssignableFrom(bound, true, matchedBefore, false) :
+						!type.equalsType(bound)) {
 					return false;
 				}
 			}

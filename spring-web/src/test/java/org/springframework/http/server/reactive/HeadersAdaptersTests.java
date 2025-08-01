@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2025 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.support.HttpComponentsHeadersAdapter;
 import org.springframework.http.support.JettyHeadersAdapter;
 import org.springframework.http.support.Netty4HeadersAdapter;
-import org.springframework.http.support.Netty5HeadersAdapter;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.LinkedCaseInsensitiveMap;
 import org.springframework.util.MultiValueMap;
@@ -273,7 +272,6 @@ class HeadersAdaptersTests {
 		return Stream.of(
 				argumentSet("Map", CollectionUtils.toMultiValueMap(new LinkedCaseInsensitiveMap<>(8, Locale.ENGLISH))),
 				argumentSet("Netty", new Netty4HeadersAdapter(new DefaultHttpHeaders())),
-				argumentSet("Netty5", new Netty5HeadersAdapter(io.netty5.handler.codec.http.headers.HttpHeaders.newHeaders())),
 				argumentSet("Tomcat", new TomcatHeadersAdapter(new MimeHeaders())),
 				argumentSet("Undertow", new UndertowHeadersAdapter(new HeaderMap())),
 				argumentSet("Jetty", new JettyHeadersAdapter(HttpFields.build())),
@@ -291,8 +289,6 @@ class HeadersAdaptersTests {
 	static Stream<Arguments> nativeHeadersWithCasedEntries() {
 		return Stream.of(
 				argumentSet("Netty", new Netty4HeadersAdapter(withHeaders(new DefaultHttpHeaders(), h -> h::add))),
-				argumentSet("Netty5", new Netty5HeadersAdapter(withHeaders(io.netty5.handler.codec.http.headers.HttpHeaders.newHeaders(),
-						h -> h::add))),
 				argumentSet("Tomcat", new TomcatHeadersAdapter(withHeaders(new MimeHeaders(),
 						h -> (k, v) -> h.addValue(k).setString(v)))),
 				argumentSet("Undertow", new UndertowHeadersAdapter(withHeaders(new HeaderMap(),

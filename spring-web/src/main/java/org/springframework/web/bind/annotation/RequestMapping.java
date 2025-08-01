@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2024 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -215,5 +215,20 @@ public @interface RequestMapping {
 	 * @see org.springframework.http.MediaType
 	 */
 	String[] produces() default {};
+
+	/**
+	 * Narrows the primary mapping by an API version. The version may be one
+	 * of the following:
+	 * <ul>
+	 * <li>Fixed version ("1.2") -- match this version only.
+	 * <li>Baseline version ("1.2+") -- match this and subsequent versions.
+	 * </ul>
+	 * <p>A baseline version allows an endpoint to continue to work in
+	 * subsequent versions if it remains compatible. When an incompatible change
+	 * is made eventually, a new controller method for the same endpoint but
+	 * with a higher version takes precedence.
+	 * @since 7.0
+	 */
+	String version() default "";
 
 }

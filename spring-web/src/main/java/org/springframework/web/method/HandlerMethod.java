@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2025 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -176,9 +176,14 @@ public class HandlerMethod extends AnnotatedMethod {
 	}
 
 	/**
-	 * Re-create HandlerMethod with additional input.
+	 * Re-create new HandlerMethod instance that copies the given HandlerMethod
+	 * but replaces the handler, and optionally checks for the presence of
+	 * validation annotations.
+	 * <p>Subclasses can override this to ensure that a HandlerMethod is of the
+	 * same type if re-created.
+	 * @since 6.2.3
 	 */
-	private HandlerMethod(HandlerMethod handlerMethod, @Nullable Object handler, boolean initValidateFlags) {
+	protected HandlerMethod(HandlerMethod handlerMethod, @Nullable Object handler, boolean initValidateFlags) {
 		super(handlerMethod);
 		this.bean = (handler != null ? handler : handlerMethod.bean);
 		this.beanFactory = handlerMethod.beanFactory;
@@ -192,7 +197,8 @@ public class HandlerMethod extends AnnotatedMethod {
 				handlerMethod.validateReturnValue);
 		this.responseStatus = handlerMethod.responseStatus;
 		this.responseStatusReason = handlerMethod.responseStatusReason;
-		this.resolvedFromHandlerMethod = handlerMethod;
+		this.resolvedFromHandlerMethod = (handlerMethod.resolvedFromHandlerMethod != null ?
+				handlerMethod.resolvedFromHandlerMethod : handlerMethod);
 		this.description = handlerMethod.toString();
 	}
 
@@ -346,6 +352,12 @@ public class HandlerMethod extends AnnotatedMethod {
 		return (this.bean.hashCode() * 31 + super.hashCode());
 	}
 
+	/**
+	 * Returns a concise description of this {@code HandlerMethod}, which is used
+	 * in log and error messages.
+	 * <p>The description should typically include the method signature of the
+	 * underlying handler method for clarity and debugging purposes.
+	 */
 	@Override
 	public String toString() {
 		return this.description;

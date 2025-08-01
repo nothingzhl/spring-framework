@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2025 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1527,6 +1527,12 @@ class ResolvableTypeTests {
 		assertThat(repository3.isAssignableFromResolvedPart(repository2)).isTrue();
 	}
 
+	@Test
+	void gh34541() throws Exception {
+		ResolvableType typeWithGenerics = ResolvableType.forField(getClass().getDeclaredField("paymentCreator"));
+		assertThat(typeWithGenerics.isAssignableFrom(PaymentCreator.class)).isTrue();
+	}
+
 
 	private ResolvableType testSerialization(ResolvableType type) throws Exception {
 		ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -1925,6 +1931,18 @@ class ResolvableTypeTests {
 	@SuppressWarnings("serial")
 	static class RecursiveMapWithInterface extends HashMap<String, RecursiveMapWithInterface>
 			implements Map<String, RecursiveMapWithInterface> {
+	}
+
+
+	PaymentCreator<? extends Payment, PaymentCreatorParameter<? extends Payment>> paymentCreator;
+
+	static class PaymentCreator<T extends Payment, P extends PaymentCreatorParameter<T>> {
+	}
+
+	static class PaymentCreatorParameter<T extends Payment> {
+	}
+
+	abstract static class Payment {
 	}
 
 

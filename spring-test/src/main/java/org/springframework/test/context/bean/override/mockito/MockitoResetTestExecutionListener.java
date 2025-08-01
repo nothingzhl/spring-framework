@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2025 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,6 +49,13 @@ import org.springframework.util.ClassUtils;
  */
 public class MockitoResetTestExecutionListener extends AbstractTestExecutionListener {
 
+	/**
+	 * The {@link #getOrder() order} value for this listener
+	 * ({@code Ordered.LOWEST_PRECEDENCE - 100}): {@value}.
+	 * @since 6.2.3
+	 */
+	public static final int ORDER = Ordered.LOWEST_PRECEDENCE - 100;
+
 	private static final Log logger = LogFactory.getLog(MockitoResetTestExecutionListener.class);
 
 	/**
@@ -73,11 +80,14 @@ public class MockitoResetTestExecutionListener extends AbstractTestExecutionList
 
 
 	/**
-	 * Returns {@code Ordered.LOWEST_PRECEDENCE - 100}.
+	 * Returns {@value #ORDER}, which ensures that the
+	 * {@code MockitoResetTestExecutionListener} is ordered after all standard
+	 * {@code TestExecutionListener} implementations.
+	 * @see #ORDER
 	 */
 	@Override
 	public int getOrder() {
-		return Ordered.LOWEST_PRECEDENCE - 100;
+		return ORDER;
 	}
 
 	@Override

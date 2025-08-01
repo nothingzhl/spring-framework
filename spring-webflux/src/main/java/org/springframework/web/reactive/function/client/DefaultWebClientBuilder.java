@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2025 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,13 +36,13 @@ import org.springframework.http.client.reactive.HttpComponentsClientHttpConnecto
 import org.springframework.http.client.reactive.JdkClientHttpConnector;
 import org.springframework.http.client.reactive.JettyClientHttpConnector;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
-import org.springframework.http.client.reactive.ReactorNetty2ClientHttpConnector;
 import org.springframework.http.codec.ClientCodecConfigurer;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.client.ApiVersionInserter;
 import org.springframework.web.util.DefaultUriBuilderFactory;
 import org.springframework.web.util.UriBuilderFactory;
 
@@ -57,8 +57,6 @@ final class DefaultWebClientBuilder implements WebClient.Builder {
 
 	private static final boolean reactorNettyClientPresent;
 
-	private static final boolean reactorNetty2ClientPresent;
-
 	private static final boolean jettyClientPresent;
 
 	private static final boolean httpComponentsClientPresent;
@@ -66,7 +64,6 @@ final class DefaultWebClientBuilder implements WebClient.Builder {
 	static {
 		ClassLoader loader = DefaultWebClientBuilder.class.getClassLoader();
 		reactorNettyClientPresent = ClassUtils.isPresent("reactor.netty.http.client.HttpClient", loader);
-		reactorNetty2ClientPresent = ClassUtils.isPresent("reactor.netty5.http.client.HttpClient", loader);
 		jettyClientPresent = ClassUtils.isPresent("org.eclipse.jetty.client.HttpClient", loader);
 		httpComponentsClientPresent =
 				ClassUtils.isPresent("org.apache.hc.client5.http.impl.async.CloseableHttpAsyncClient", loader) &&
@@ -83,6 +80,10 @@ final class DefaultWebClientBuilder implements WebClient.Builder {
 	private @Nullable HttpHeaders defaultHeaders;
 
 	private @Nullable MultiValueMap<String, String> defaultCookies;
+
+	private @Nullable Object defaultApiVersion;
+
+	private @Nullable ApiVersionInserter apiVersionInserter;
 
 	private @Nullable Consumer<WebClient.RequestHeadersSpec<?>> defaultRequest;
 
@@ -122,8 +123,11 @@ final class DefaultWebClientBuilder implements WebClient.Builder {
 			this.defaultHeaders = null;
 		}
 
-		this.defaultCookies = (other.defaultCookies != null ?
-				new LinkedMultiValueMap<>(other.defaultCookies) : null);
+		this.defaultCookies = (other.defaultCookies != null ? new LinkedMultiValueMap<>(other.defaultCookies) : null);
+
+		this.defaultApiVersion = other.defaultApiVersion;
+		this.apiVersionInserter = other.apiVersionInserter;
+
 		this.defaultRequest = other.defaultRequest;
 		this.statusHandlers = (other.statusHandlers != null ? new LinkedHashMap<>(other.statusHandlers) : null);
 		this.filters = (other.filters != null ? new ArrayList<>(other.filters) : null);
@@ -192,6 +196,18 @@ final class DefaultWebClientBuilder implements WebClient.Builder {
 			this.defaultCookies = new LinkedMultiValueMap<>(3);
 		}
 		return this.defaultCookies;
+	}
+
+	@Override
+	public WebClient.Builder defaultApiVersion(Object version) {
+		this.defaultApiVersion = version;
+		return this;
+	}
+
+	@Override
+	public WebClient.Builder apiVersionInserter(ApiVersionInserter apiVersionInserter) {
+		this.apiVersionInserter = apiVersionInserter;
+		return this;
 	}
 
 	@Override
@@ -301,6 +317,7 @@ final class DefaultWebClientBuilder implements WebClient.Builder {
 		return new DefaultWebClient(
 				exchange, filterFunctions,
 				initUriBuilderFactory(), defaultHeaders, defaultCookies,
+				this.defaultApiVersion, this.apiVersionInserter,
 				this.defaultRequest,
 				this.statusHandlers,
 				this.observationRegistry, this.observationConvention,
@@ -310,9 +327,6 @@ final class DefaultWebClientBuilder implements WebClient.Builder {
 	private ClientHttpConnector initConnector() {
 		if (reactorNettyClientPresent) {
 			return new ReactorClientHttpConnector();
-		}
-		else if (reactorNetty2ClientPresent) {
-			return new ReactorNetty2ClientHttpConnector();
 		}
 		else if (jettyClientPresent) {
 			return new JettyClientHttpConnector();

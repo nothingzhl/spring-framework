@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2025 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -162,7 +162,7 @@ public class SingletonSupplier<T> implements Supplier<@Nullable T> {
 	 * @return the singleton supplier, or {@code null} if the instance supplier was {@code null}
 	 */
 	@Contract("null -> null; !null -> !null")
-	public static <T> @Nullable SingletonSupplier<T> ofNullable(@Nullable Supplier<? extends @Nullable T> supplier) {
+	public static <T> @Nullable SingletonSupplier<T> ofNullable(@Nullable Supplier<@Nullable T> supplier) {
 		return (supplier != null ? new SingletonSupplier<>(supplier) : null);
 	}
 

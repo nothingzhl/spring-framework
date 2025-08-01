@@ -1,5 +1,5 @@
 /*
- * Copyright 2002-2025 the original author or authors.
+ * Copyright 2002-present the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -79,8 +79,8 @@ public class DefaultJCacheOperationSource extends AnnotationJCacheOperationSourc
 	 * @since 5.1
 	 */
 	public DefaultJCacheOperationSource(
-			@Nullable Supplier<? extends @Nullable CacheManager> cacheManager, @Nullable Supplier<? extends @Nullable CacheResolver> cacheResolver,
-			@Nullable Supplier<? extends @Nullable CacheResolver> exceptionCacheResolver, @Nullable Supplier<? extends @Nullable KeyGenerator> keyGenerator) {
+			@Nullable Supplier<@Nullable CacheManager> cacheManager, @Nullable Supplier<@Nullable CacheResolver> cacheResolver,
+			@Nullable Supplier<@Nullable CacheResolver> exceptionCacheResolver, @Nullable Supplier<@Nullable KeyGenerator> keyGenerator) {
 
 		this.cacheManager = SingletonSupplier.ofNullable(cacheManager);
 		this.cacheResolver = SingletonSupplier.ofNullable(cacheResolver);
